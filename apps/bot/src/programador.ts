@@ -64,7 +64,7 @@ export async function textoResumenSemanal(db: DB, desde: string, hasta: string, 
   if (r.ranking.length) {
     l.push("", "<b>Quién ha hecho qué</b>");
     const medallas = ["🥇", "🥈", "🥉"];
-    r.ranking.forEach((x, i) => l.push(`${medallas[i] ?? "•"} ${html(x.socio)}: ${x.ventas} ventas (${euros(x.vendidoCent)}), ${x.visitas} visitas`));
+    r.ranking.forEach((x, i) => l.push(`${medallas[i] ?? "•"} ${html(x.socio)}: ${plural(x.ventas, "venta", "ventas")} (${euros(x.vendidoCent)}), ${plural(x.visitas, "visita", "visitas")}`));
   }
   const sinNada = socios.filter((s) => !r.ranking.some((x) => x.socio === s.nombre));
   if (sinNada.length && r.ranking.length) l.push(`😴 Sin actividad: ${sinNada.map((s) => html(s.nombre)).join(", ")}`);

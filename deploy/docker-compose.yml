@@ -1,0 +1,109 @@
+# Se copia a ~/servicios/nfc/ en el VPS (tools/deploy.mjs). Sin `ports:` a propósito: el panel solo se alcanza
+# por el túnel de Cloudflare (red `proxy`) y Postgres solo desde la red interna.
+services:
+  web:
+    image: nfc-bot:0.1.0
+    container_name: nfc-web
+    restart: unless-stopped
+    # Docker del VPS es rootless: el root del contenedor es el usuario del host, sin privilegios reales.
+    user: "0:0"
+    cap_drop: [ALL]
+    security_opt: ["no-new-privileges:true"]
+    read_only: true
+    environment:
+      DATABASE_URL: postgres://nfc:${POSTGRES_PASSWORD}@db:5432/nfc
+      PUBLIC_URL: ${PUBLIC_URL}
+      APP_VERSION: ${APP_VERSION}
+      LOG_LEVEL: warn
+    command: ["node", "api/dist/server.js"]
+    healthcheck:
+      test: ["CMD", "node", "-e", "fetch('http://127.0.0.1:3000/health').then(r=>process.exit(r.ok?0:1)).catch(()=>process.exit(1))"]
+      interval: 30s
+      timeout: 3s
+      start_period: 15s
+    depends_on:
+      db: { condition: service_healthy }
+    mem_limit: 256m
+    cpus: 0.5
+    logging: { driver: json-file, options: { max-size: "10m", max-file: "3" } }
+    networks: [proxy, internal]
+
+  # El bot habla con Telegram por long polling (sale a internet, no necesita ruta pública).
+  # Arranca cuando la web está sana: la web aplica las migraciones.
+  bot:
+    image: nfc-bot:0.1.0
+    container_name: nfc-bot
+    restart: unless-stopped
+    user: "0:0"
+    cap_drop: [ALL]
+    security_opt: ["no-new-privileges:true"]
+    read_only: true
+    environment:
+      DATABASE_URL: postgres://nfc:${POSTGRES_PASSWORD}@db:5432/nfc
+      BOT_TOKEN: ${BOT_TOKEN}
+      SETUP_CODE: ${SETUP_CODE}
+      GEMINI_API_KEY: ${GEMINI_API_KEY:-}
+      PUBLIC_URL: ${PUBLIC_URL}
+      APP_VERSION: ${APP_VERSION}
+    command: ["node", "bot/dist/bot.js"]
+    healthcheck:
+      test: ["CMD", "node", "-e", "fetch('http://127.0.0.1:3001/').then(r=>process.exit(r.ok?0:1)).catch(()=>process.exit(1))"]
+      interval: 60s
+      timeout: 5s
+      start_period: 30s
+    depends_on:
+      web: { condition: service_healthy }
+    mem_limit: 256m
+    cpus: 0.5
+    logging: { driver: json-file, options: { max-size: "10m", max-file: "3" } }
+    networks: [proxy, internal]
+
+  db:
+    image: postgres:17-alpine
+    container_name: nfc-db
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: nfc
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
+      POSTGRES_DB: nfc
+    volumes: [nfc-db:/var/lib/postgresql/data]
+    security_opt: ["no-new-privileges:true"]
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U nfc"]
+      interval: 5s
+      timeout: 3s
+      retries: 20
+    mem_limit: 256m
+    logging: { driver: json-file, options: { max-size: "10m", max-file: "3" } }
+    networks: [internal]
+
+  # Copia diaria con pg_dump (30 días) en ./backups; tools/pull-backups.sh la trae al Mac.
+  backup:
+    image: postgres:17-alpine
+    container_name: nfc-backup
+    restart: unless-stopped
+    user: "0:0"
+    environment:
+      PGPASSWORD: ${POSTGRES_PASSWORD}
+    volumes: [./backups:/backups]
+    entrypoint: ["/bin/sh", "-c"]
+    command:
+      - |
+        while true; do
+          f=/backups/nfc-$$(date +%F).sql.gz
+          pg_dump -h db -U nfc -d nfc --no-owner | gzip > $$f.tmp && mv $$f.tmp $$f && echo "backup ok $$f"
+          find /backups -name 'nfc-*.sql.gz' -mtime +30 -delete
+          sleep 86400
+        done
+    depends_on:
+      db: { condition: service_healthy }
+    networks: [internal]
+
+volumes:
+  nfc-db:
+
+networks:
+  proxy:
+    external: true
+  internal:
+    internal: true

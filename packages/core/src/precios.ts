@@ -74,7 +74,8 @@ export function calcularPrecio(uds: number, precioCent: number, tramos: TramoPre
       const sueltasCent = sueltas * unitCent;
       total = o.tipo === "nxm" ? grupos * (o.m ?? o.n) * unitCent + sueltasCent : grupos * (o.precioCent ?? 0) + sueltasCent;
     }
-    if (total < mejor.totalCent) mejor = { totalCent: total, aplicado: `Oferta «${o.nombre}» (${describirOferta(o)})`, ofertaId: o.id };
+    const desc = describirOferta(o);
+    if (total < mejor.totalCent) mejor = { totalCent: total, aplicado: o.nombre === desc ? `Oferta ${desc}` : `Oferta «${o.nombre}» (${desc})`, ofertaId: o.id };
   }
   return { uds, listaCent, ahorroCent: listaCent - mejor.totalCent, ...mejor };
 }

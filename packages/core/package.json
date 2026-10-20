@@ -4,7 +4,12 @@
   "private": true,
   "type": "module",
   "main": "./src/index.ts",
-  "exports": { ".": "./src/index.ts", "./testing": "./src/testing.ts" },
+  "exports": {
+    ".": "./src/index.ts",
+    "./testing": "./src/testing.ts",
+    "./precios": "./src/precios.ts",
+    "./texto": "./src/texto.ts"
+  },
   "scripts": {
     "typecheck": "tsc -p .",
     "test": "vitest run",

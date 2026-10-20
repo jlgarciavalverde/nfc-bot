@@ -17,6 +17,12 @@ const { db, sql: conn } = createDb(config.databaseUrl);
 const interprete = config.aiFake ? crearFake() : config.geminiApiKey ? crearGemini({ apiKey: config.geminiApiKey, model: config.geminiModel }) : undefined;
 const bot = crearBot({ db, config, interprete });
 
+try {
+  await bot.init();
+} catch (e) {
+  console.error(`No puedo conectar con Telegram: ${(e as Error).message}. ¿Es correcto BOT_TOKEN?`);
+  process.exit(1);
+}
 await bot.api.setMyCommands([
   { command: "ayuda", description: "Qué puedo hacer" },
   { command: "visita", description: "Apuntar una visita: /visita Bar Pepe si|no|luego" },

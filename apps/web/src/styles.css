@@ -1,0 +1,54 @@
+@import "tailwindcss";
+
+/* Libro de cuentas: papel blanco, tinta negra, una sola tinta de color (ámbar de estrella de reseña) y
+   verde/rojo solo para dinero que entra o sale. Cifras tabulares siempre. */
+@theme {
+  --font-sans: ui-sans-serif, system-ui, -apple-system, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+  --font-mono: ui-monospace, "SF Mono", "Cascadia Mono", Menlo, Consolas, monospace;
+  --color-papel: #ffffff;
+  --color-fondo: #f6f6f4;
+  --color-tinta: #161616;
+  --color-tinta-2: #55554f;
+  --color-tinta-3: #6e6e68;
+  --color-regla: #e3e3de;
+  --color-regla-2: #cfcfc8;
+  --color-estrella: #f2b01e;
+  --color-estrella-texto: #8a5a00;
+  --color-entra: #17723c;
+  --color-sale: #b42318;
+  --color-foco: #1f5fd1;
+  --color-e-pendiente: #9a9a92;
+  --color-e-interesado: #d29a00;
+  --color-e-si: #2f8f4e;
+  --color-e-no: #c4382c;
+  --color-e-cliente: #161616;
+}
+
+@layer base {
+  :root { color-scheme: light; }
+  @media (prefers-color-scheme: dark) {
+    :root {
+      color-scheme: dark;
+      --color-papel: #1b1b1a;
+      --color-fondo: #121211;
+      --color-tinta: #ededea;
+      --color-tinta-2: #b9b9b2;
+      --color-tinta-3: #9a9a93;
+      --color-regla: #2e2e2c;
+      --color-regla-2: #444441;
+      --color-estrella-texto: #f2c14e;
+      --color-entra: #5cc584;
+      --color-sale: #f2786c;
+      --color-foco: #7aa7ff;
+      --color-e-pendiente: #75756f;
+      --color-e-cliente: #ededea;
+    }
+  }
+  html { background: var(--color-fondo); color: var(--color-tinta); -webkit-text-size-adjust: 100%; }
+  body { font-family: var(--font-sans); font-size: 15px; line-height: 1.45; }
+  :focus-visible { outline: 2px solid var(--color-foco); outline-offset: 2px; border-radius: 3px; }
+  .num { font-variant-numeric: tabular-nums; }
+  table { border-collapse: collapse; width: 100%; }
+}
+
+.leaflet-container { font: inherit; background: var(--color-fondo); }

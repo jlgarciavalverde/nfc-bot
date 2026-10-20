@@ -4,7 +4,9 @@
   "version": "0.0.0",
   "type": "module",
   "packageManager": "pnpm@12.4.2",
-  "engines": { "node": ">=22" },
+  "engines": {
+    "node": ">=22"
+  },
   "scripts": {
     "db:up": "docker compose -f docker-compose.dev.yml up -d --wait",
     "db:down": "docker compose -f docker-compose.dev.yml down",
@@ -15,5 +17,11 @@
     "typecheck": "pnpm -r typecheck",
     "test": "pnpm -r --workspace-concurrency=1 test",
     "e2e": "playwright test"
+  },
+  "devDependencies": {
+    "@nfc/core": "workspace:*",
+    "@playwright/test": "^1.64.1",
+    "exceljs": "^4.4.0",
+    "tsx": "^4.23.15"
   }
 }
