@@ -1,0 +1,7 @@
+#!/bin/sh
+# Bloquea commits con secretos (tokens, claves, contraseñas). Instalar: git config core.hooksPath .githooks
+if command -v gitleaks >/dev/null 2>&1; then
+  gitleaks git --staged --redact --no-banner || { echo "✗ gitleaks ha encontrado posibles secretos. Revisa el commit."; exit 1; }
+else
+  echo "⚠ gitleaks no está instalado (brew install gitleaks): commit sin comprobar secretos."
+fi

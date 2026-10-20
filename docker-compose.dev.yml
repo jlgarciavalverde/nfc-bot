@@ -1,0 +1,20 @@
+# Postgres para desarrollo y tests. Solo escucha en 127.0.0.1.
+services:
+  db:
+    image: postgres:17-alpine
+    container_name: nfc-db-dev
+    environment:
+      POSTGRES_USER: nfc
+      POSTGRES_PASSWORD: nfc
+      POSTGRES_DB: nfc
+    ports: ["127.0.0.1:5434:5432"]
+    volumes:
+      - nfc-db-dev:/var/lib/postgresql/data
+      - ./tools/dev-db-init.sql:/docker-entrypoint-initdb.d/init.sql:ro
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U nfc"]
+      interval: 2s
+      timeout: 3s
+      retries: 20
+volumes:
+  nfc-db-dev:

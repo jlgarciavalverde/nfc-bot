@@ -1,0 +1,7 @@
+[extend]
+useDefault = true
+
+[allowlist]
+description = "Credenciales de desarrollo/test locales (Postgres en 127.0.0.1)"
+regexes = ['''postgres://nfc:nfc@127\.0\.0\.1''']
+paths = ['''pnpm-lock\.yaml''']
