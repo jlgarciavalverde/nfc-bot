@@ -1,6 +1,6 @@
 import { Bot, GrammyError, InlineKeyboard, type Context } from "grammy";
-import type { UserFromGetMe } from "grammy/types";
-import { eq, sql } from "drizzle-orm";
+import type { InlineKeyboardButton, UserFromGetMe } from "grammy/types";
+import { and, eq, gt, isNull, sql } from "drizzle-orm";
 import {
   altaSocio, crearEnlacePanel, deshacerUltima, ErrorNegocio, guardarAjuste, haySocios, hoy as hoyMadrid, html, leerAjustes,
   listarProductos, marcarHecho, nombresComercios, recientesDeSocio, socioPorTelegram, tablas, MINUTOS_ENLACE, type DB, type Socio,
@@ -8,6 +8,7 @@ import {
 import type { BotConfig } from "./config";
 import type { Accion } from "./acciones";
 import { parseComando } from "./comandos";
+import { bienvenida, chuleta } from "./ayuda";
 import { ejecutar, proponer, resolverPendiente, type Respuesta } from "./ejecutor";
 import { ErrorIa, type Interprete } from "./ia/interpretar";
 
@@ -58,6 +59,8 @@ export function crearBot(deps: Deps, botInfo?: UserFromGetMe) {
       });
     }
     if (r.grupo && ctx.grupoId) await ctx.api.sendMessage(ctx.grupoId, r.grupo, { parse_mode: "HTML" });
+    // Si nunca ha abierto el chat privado con el bot, Telegram no deja escribirle: no pasa nada
+    if (r.privado) await ctx.api.sendMessage(r.privado.telegramId, r.privado.texto, { parse_mode: "HTML", link_preview_options: { is_disabled: true } }).catch(() => {});
   }
 
   async function correr(ctx: Ctx, f: () => Promise<Respuesta>) {
@@ -70,7 +73,7 @@ export function crearBot(deps: Deps, botInfo?: UserFromGetMe) {
     }
   }
 
-  const contexto = (ctx: Ctx, origen: "bot" | "ia" = "bot") => ({ db, socio: ctx.socio!, hoy: hoyMadrid(ahora()), origen });
+  const contexto = (ctx: Ctx, origen: "bot" | "ia" = "bot") => ({ db, socio: ctx.socio!, hoy: hoyMadrid(ahora()), origen, botUsername: ctx.me.username });
 
   // ── Quién escribe y desde dónde ──
   bot.use(async (ctx, next) => {
@@ -79,17 +82,19 @@ export function crearBot(deps: Deps, botInfo?: UserFromGetMe) {
     ctx.socio = await socioPorTelegram(db, from.id);
     ctx.grupoId = (await leerAjustes(db)).grupoChatId;
     const chat = ctx.chat;
+    // «Quiero ser socio» de la bienvenida: lo puede pulsar cualquiera del grupo vinculado
+    if (ctx.callbackQuery?.data === "unirme" && chat?.id === ctx.grupoId) return next();
     // Botón pulsado por alguien que no es socio (p. ej. «Aprobar» en su propia petición de alta)
     if (ctx.callbackQuery && !ctx.socio) return void (await ctx.answerCallbackQuery({ text: "Esto es solo para socios.", show_alert: true }).catch(() => {}));
     const texto = ctx.message?.text ?? "";
     const cmd = /^\/(\w+)/.exec(texto)?.[1]?.toLowerCase();
     if (chat?.type === "private") {
-      // Por privado solo socios, salvo el alta inicial con el código.
-      if (ctx.socio || (cmd === "start" && config.setupCode)) return next();
+      // Por privado solo socios, salvo /start (alta inicial con el código o explicar cómo entrar).
+      if (ctx.socio || cmd === "start") return next();
       return;
     }
     if (chat?.type === "group" || chat?.type === "supergroup") {
-      if (chat.id === ctx.grupoId) return ctx.socio || cmd === "unirme" ? next() : undefined;
+      if (chat.id === ctx.grupoId) return ctx.socio || cmd === "unirme" || ctx.message?.new_chat_members ? next() : undefined;
       // Otro grupo: solo un admin puede vincularlo; si no, silencio.
       if (cmd === "vincular" && ctx.socio?.rol === "admin") return next();
       return;
@@ -102,7 +107,10 @@ export function crearBot(deps: Deps, botInfo?: UserFromGetMe) {
     if (ctx.chat.type !== "private") return;
     if (ctx.socio) return correr(ctx, () => ejecutar(contexto(ctx), { t: "ayuda" }));
     const codigo = ctx.match.trim();
-    if (!config.setupCode || codigo !== config.setupCode || (await haySocios(db))) return;
+    if (!config.setupCode || codigo !== config.setupCode || (await haySocios(db))) {
+      // Alguien del grupo que abre el chat privado antes de que le aprueben
+      return ctx.reply("👋 Hola. Aún no eres socio: pulsa «Quiero ser socio» en el grupo (o escribe /unirme allí) y, cuando un admin te apruebe, te escribo por aquí.");
+    }
     const s = await altaSocio(db, { telegramId: ctx.from!.id, nombre: nombreDe(ctx), username: ctx.from!.username }, null);
     await ctx.reply(
       `👑 Hola, ${html(s.nombre)}. Eres el primer socio y admin.\n\n1. Añádeme al grupo de socios y escribe allí /vincular.\n2. Los demás escriben /unirme en el grupo y tú los apruebas.\n3. Crea el producto: /producto nuevo Panel NFC 25€\n\nDesactiva el modo privacidad en @BotFather (/setprivacy → Disable) si quieres hablarme normal en el grupo.`,
@@ -117,20 +125,63 @@ export function crearBot(deps: Deps, botInfo?: UserFromGetMe) {
     await ctx.reply("🔗 Grupo vinculado: a partir de ahora trabajo aquí (y en privado con cada socio). Los demás: /unirme");
   });
 
-  bot.command("unirme", async (ctx) => {
-    if (ctx.chat.id !== ctx.grupoId) return;
-    if (ctx.socio) return ctx.reply("Ya eres socio. 😉");
+  /** Petición de alta: un mensaje en el grupo con «Aprobar» para los admins (una sola petición abierta por persona). */
+  async function pedirAlta(ctx: Ctx) {
     const u = ctx.from!;
-    const admins = (await db.select().from(tablas.socios).where(eq(tablas.socios.rol, "admin")))[0];
-    if (!admins) return;
+    const nombre = nombreDe(ctx);
+    const [admin] = await db.select().from(tablas.socios).where(and(eq(tablas.socios.rol, "admin"), eq(tablas.socios.activo, true))).limit(1);
+    if (!admin) return;
+    const [abierta] = await db
+      .select({ id: tablas.pendientes.id })
+      .from(tablas.pendientes)
+      .where(and(eq(tablas.pendientes.telegramId, u.id), isNull(tablas.pendientes.resueltaAt), gt(tablas.pendientes.expiraAt, new Date())))
+      .limit(1);
+    if (abierta) return enviar(ctx, { texto: `${html(nombre)}, tu petición ya está hecha: falta que un admin la apruebe.` });
     // La propuesta la «firma» un admin cualquiera; la puede aprobar cualquier admin.
     const r = await proponer(
-      { db, socio: admins, hoy: hoyMadrid(ahora()), origen: "bot" },
-      `🙋 ${html(nombreDe(ctx))}${u.username ? ` (@${html(u.username)})` : ""} quiere unirse como socio. Un admin tiene que aprobarlo.`,
-      [{ etiqueta: "✅ Aprobar", p: { a: { t: "alta", telegramId: u.id, nombre: nombreDe(ctx), username: u.username ?? null } } }],
+      { db, socio: admin, hoy: hoyMadrid(ahora()), origen: "bot" },
+      `🙋 ${html(nombre)}${u.username ? ` (@${html(u.username)})` : ""} quiere unirse como socio. Un admin tiene que aprobarlo.`,
+      [{ etiqueta: "✅ Aprobar", p: { a: { t: "alta", telegramId: u.id, nombre, username: u.username ?? null } } }],
       u.id,
     );
     await enviar(ctx, r);
+  }
+
+  bot.command("unirme", async (ctx) => {
+    if (ctx.chat.id !== ctx.grupoId) return;
+    if (ctx.socio) return ctx.reply("Ya eres socio. 😉");
+    await pedirAlta(ctx);
+  });
+
+  bot.callbackQuery("unirme", async (ctx) => {
+    if (ctx.socio) return ctx.answerCallbackQuery({ text: "Ya eres socio. 😉", show_alert: true });
+    await ctx.answerCallbackQuery();
+    await pedirAlta(ctx);
+  });
+
+  // ── Bienvenida al entrar en el grupo ──
+  bot.on("message:new_chat_members", async (ctx) => {
+    if (ctx.chat.id !== ctx.grupoId) return;
+    const { bienvenida: plantilla } = await leerAjustes(db);
+    for (const u of ctx.message.new_chat_members) {
+      if (u.is_bot) continue;
+      const nombre = [u.first_name, u.last_name].filter(Boolean).join(" ");
+      const yaSocio = await socioPorTelegram(db, u.id);
+      const texto = yaSocio
+        ? `👋 ¡Hola otra vez, <b>${html(nombre)}</b>! Sigues siendo socio.\n\n${chuleta(ctx.me.username)}`
+        : [
+            bienvenida(plantilla, nombre),
+            "",
+            "Para empezar:",
+            "1. Pulsa «Quiero ser socio» y un admin te aprueba.",
+            "2. Ábreme por privado y pulsa Iniciar: así te aviso cada mañana de a quién te toca volver y te mando el enlace al panel.",
+            "",
+            chuleta(ctx.me.username),
+          ].join("\n");
+      const botones: InlineKeyboardButton[][] = yaSocio ? [] : [[{ text: "🙋 Quiero ser socio", callback_data: "unirme" }]];
+      botones.push([{ text: "💬 Abrir chat privado", url: `https://t.me/${ctx.me.username}?start=hola` }]);
+      await ctx.reply(texto, { parse_mode: "HTML", link_preview_options: { is_disabled: true }, reply_markup: { inline_keyboard: botones } });
+    }
   });
 
   bot.command("deshacer", (ctx) =>
@@ -220,7 +271,7 @@ export function crearBot(deps: Deps, botInfo?: UserFromGetMe) {
     const id = Number(idTxt);
     try {
       let r: Respuesta;
-      if (tipo === "ok" || tipo === "no") r = await resolverPendiente({ db, socio: ctx.socio!, hoy: hoyMadrid(ahora()) }, id, tipo === "ok");
+      if (tipo === "ok" || tipo === "no") r = await resolverPendiente({ db, socio: ctx.socio!, hoy: hoyMadrid(ahora()), botUsername: ctx.me.username }, id, tipo === "ok");
       else if (tipo === "hecho") {
         const rec = await marcarHecho(db, id, ctx.socio!.id);
         r = { texto: `✅ Hecho (recordatorio del ${rec.fecha}).` };

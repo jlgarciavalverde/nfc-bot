@@ -8,7 +8,7 @@ import {
   socioPorNombre, sumarDias, sumarMeses, tablas, tramosDe, DIAS_LUEGO, type Comercio, type DB, type ModoReparto, type Socio,
 } from "@nfc/core";
 import { Accion, ESCRITURA, SOLO_ADMIN } from "./acciones";
-import { ayuda } from "./ayuda";
+import { ayuda, bienvenida, chuleta } from "./ayuda";
 import { b, cajaTexto, embudoTexto, ICONO_ESTADO, ICONO_RESULTADO, presupuestoTexto, tablaPrecios } from "./formato";
 
 export interface Boton {
@@ -20,6 +20,8 @@ export interface Respuesta {
   botones?: Boton[][];
   /** Mensaje adicional para el grupo (p. ej. aviso de stock bajo). */
   grupo?: string;
+  /** Mensaje por privado a alguien (si no ha abierto el chat con el bot, se ignora). */
+  privado?: { telegramId: number; texto: string };
 }
 export interface Contexto {
   db: DB;
@@ -27,6 +29,8 @@ export interface Contexto {
   hoy: string;
   /** «ia» si la acción la ha propuesto la IA (las escrituras necesitan confirmación). */
   origen: "bot" | "ia";
+  /** @usuario del bot (para los ejemplos de la chuleta). */
+  botUsername?: string;
 }
 
 /** Lo que guarda una acción pendiente de confirmar. */
@@ -373,7 +377,14 @@ export async function ejecutar(ctx: Contexto, entrada: Accion): Promise<Respuest
       return configurar(ctx, a);
     case "alta": {
       const s = await altaSocio(db, { telegramId: a.telegramId, nombre: a.nombre, username: a.username }, socio.id);
-      return { texto: `👋 ${b(s.nombre)} ya es socio. Escribe /ayuda para ver qué puedo hacer.` };
+      const bot = ctx.botUsername ?? "bot";
+      return {
+        texto: `🎉 ${b(s.nombre)} ya es socio.\n\n${chuleta(bot)}`,
+        privado: {
+          telegramId: s.telegramId,
+          texto: `🎉 ¡Ya eres socio, ${b(s.nombre)}! Esto es todo lo que puedo hacer:\n\n${ayuda(undefined, s.rol === "admin")}\n\nCada mañana a las 9:00 te escribiré aquí a qué comercios te toca volver. El panel web con gráficas y el Excel: /panel`,
+        },
+      };
     }
   }
 }
@@ -424,6 +435,11 @@ async function configurar(ctx: Contexto, a: Extract<Accion, { t: "config" }>): P
       const p = await resolverProducto(db, v);
       await guardarAjuste(db, "productoDefectoId", p.id);
       return { texto: `Producto por defecto: ${b(p.nombre)}.` };
+    }
+    case "bienvenida": {
+      const t = a.valor.trim();
+      await guardarAjuste(db, "bienvenida", t || null);
+      return { texto: `${t ? "Bienvenida cambiada" : "Bienvenida por defecto"}. Así la verá quien entre:\n\n${bienvenida(t || null, socio.nombre)}` };
     }
   }
 }

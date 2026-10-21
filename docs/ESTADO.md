@@ -10,8 +10,15 @@ Hecho todo el plan (F0–F6):
   y confirmación por botón.
 - **Panel** (`nfc.redgarverde.com`): resumen con gráficas, comercios + ficha, mapa, ventas, caja, stock, reparto,
   precios (edición para admin, calculadora) y Excel con 7 hojas.
-- **Tests**: core 26, bot 18, api 7, e2e 6.
+- **Tests**: core 26, bot 21, api 7, e2e 6.
 - Copias: `nfc-backup` diario (30 días) + `tools/pull-backups.sh` y simulacro de restauración en el Mac (launchd).
+
+## v0.2.0 (2026-10-21)
+- Bienvenida al entrar en el grupo con botones «Quiero ser socio» (= /unirme, una petición abierta por persona) y
+  «Abrir chat privado» + chuleta de comandos. Al aprobar: chuleta en el grupo y guía completa por privado.
+  `/config bienvenida …` (admin) cambia el texto (`{nombre}`). `/start` de alguien que aún no es socio le explica cómo entrar.
+- IA: si Gemini está saturado, prueba el siguiente modelo (`GEMINI_MODELS`, por defecto flash → flash-lite) (v0.1.1).
+- Producción: bot con token y Gemini, admin «Cheluisss» dado de alta, grupo «Billetes» vinculado.
 
 ## Pendiente (lo tiene que hacer el usuario)
 1. Crear el bot en @BotFather y poner `BOT_TOKEN` en el VPS (ver OPERACIONES). Desactivar *privacy mode* (`/setprivacy` → Disable)

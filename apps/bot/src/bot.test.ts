@@ -62,10 +62,11 @@ async function montar() {
 
 describe("acceso", () => {
   it("alta inicial con código, vincular grupo y aprobar socios", async () => {
-    expect(textos(await escribir(ANA, ANA, "/start malo"))).toHaveLength(0);
+    expect(textos(await escribir(ANA, ANA, "/start malo"))[0]).toContain("Aún no eres socio");
     expect(textos(await escribir(ANA, ANA, "/start secreto"))[0]).toContain("primer socio");
     // el código ya no sirve una segunda vez
-    expect(textos(await escribir(BEA, BEA, "/start secreto"))).toHaveLength(0);
+    expect(textos(await escribir(BEA, BEA, "/start secreto"))[0]).toContain("Aún no eres socio");
+    expect(await db.select().from(tablas.socios)).toHaveLength(1);
     await escribir(ANA, GRUPO, "/vincular");
     expect((await leerAjustes(db)).grupoChatId).toBe(GRUPO);
     const r = await escribir(BEA, GRUPO, "/unirme");
@@ -82,6 +83,52 @@ describe("acceso", () => {
     expect(await escribir(EXTRA, GRUPO, "/caja")).toHaveLength(0);
     expect(await escribir(ANA, -555, "/caja")).toHaveLength(0);
     expect(textos(await escribir(BEA, GRUPO, "/tramo 5 20€"))[0]).toContain("solo lo puede hacer un admin");
+  });
+});
+
+describe("bienvenida", () => {
+  it("al entrar alguien: bienvenida con botones; «Quiero ser socio» pide el alta una sola vez; al aprobar, chuleta en el grupo y guía por privado", async () => {
+    await montar();
+    llamadas = [];
+    await bot.handleUpdate({
+      update_id: uid++,
+      message: { message_id: uid++, date: 0, chat: chatDe(GRUPO, ANA), from: usuario(ANA, "Ana"), new_chat_members: [usuario(EXTRA, "Carlos"), { ...usuario(77), is_bot: true }] },
+    } as Update);
+    expect(textos(llamadas)).toHaveLength(1);
+    expect(textos(llamadas)[0]).toContain("¡Bienvenido/a, <b>Carlos</b>!");
+    expect(textos(llamadas)[0]).toContain("/venta Bar Pepe 3 pagado bizum");
+    expect(botones(llamadas).map((x) => x.text)).toEqual(["🙋 Quiero ser socio", "💬 Abrir chat privado"]);
+
+    let r = await pulsar(EXTRA, GRUPO, "unirme");
+    const aprobar = botones(r).find((x) => x.text.includes("Aprobar"))!;
+    expect(aprobar).toBeDefined();
+    expect(textos(await pulsar(EXTRA, GRUPO, "unirme"))[0]).toContain("ya está hecha");
+    expect(textos(await escribir(EXTRA, GRUPO, "/unirme"))[0]).toContain("ya está hecha");
+
+    r = await pulsar(ANA, GRUPO, aprobar.callback_data);
+    expect(textos(r)[0]).toContain("ya es socio");
+    expect(textos(r)[0]).toContain("Lo básico");
+    expect(textos(r)[0]).toContain("@nfc_bot hemos vendido");
+    const dm = r.find((l) => l.payload.chat_id === EXTRA);
+    expect(dm?.payload.text).toContain("¡Ya eres socio");
+  });
+  it("un socio que vuelve a entrar recibe un saludo sin botón de alta; un desconocido por privado recibe instrucciones", async () => {
+    await montar();
+    llamadas = [];
+    await bot.handleUpdate({ update_id: uid++, message: { message_id: uid++, date: 0, chat: chatDe(GRUPO, BEA), from: usuario(BEA, "Bea"), new_chat_members: [usuario(BEA, "Bea")] } } as Update);
+    expect(textos(llamadas)[0]).toContain("Hola otra vez");
+    expect(botones(llamadas).map((x) => x.text)).toEqual(["💬 Abrir chat privado"]);
+    expect(textos(await escribir(EXTRA, EXTRA, "/start hola"))[0]).toContain("Aún no eres socio");
+    expect(await escribir(EXTRA, EXTRA, "/caja")).toHaveLength(0);
+  });
+  it("el admin cambia el texto de bienvenida (y lo vuelve a dejar por defecto)", async () => {
+    await montar();
+    expect(textos(await escribir(ANA, GRUPO, "/config bienvenida Ey {nombre}, bienvenido a <Billetes>"))[0]).toContain("Ey <b>Ana</b>, bienvenido a &lt;Billetes&gt;");
+    llamadas = [];
+    await bot.handleUpdate({ update_id: uid++, message: { message_id: uid++, date: 0, chat: chatDe(GRUPO, ANA), from: usuario(ANA), new_chat_members: [usuario(EXTRA, "Carlos")] } } as Update);
+    expect(textos(llamadas)[0]).toMatch(/^Ey <b>Carlos<\/b>/);
+    expect(textos(await escribir(BEA, GRUPO, "/config bienvenida hola"))[0]).toContain("solo lo puede hacer un admin");
+    expect(textos(await escribir(ANA, GRUPO, "/config bienvenida"))[0]).toContain("Bienvenida por defecto");
   });
 });
 

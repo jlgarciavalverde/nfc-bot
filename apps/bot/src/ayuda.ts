@@ -1,4 +1,4 @@
-import { normalizar } from "@nfc/core";
+import { html, normalizar } from "@nfc/core";
 
 const TEMAS: Record<string, { titulo: string; lineas: string[]; admin?: boolean }> = {
   comercios: {
@@ -64,6 +64,7 @@ const TEMAS: Record<string, { titulo: string; lineas: string[]; admin?: boolean 
       "/oferta 3x2 · /oferta pack 5 99€ · /oferta -10% desde 20 · «hasta 31/12» · /oferta quitar 3",
       "/config reparto igual|porcentaje|aportado · /config comision 10% · /config porcentaje Ana 50%",
       "/config stock 5 · /config admin Ana · /config socio Ana · /config baja Ana",
+      "/config bienvenida ¡Hola, {nombre}! … — texto al entrar alguien al grupo (vacío = el de por defecto)",
       "/vincular — en el grupo, para que el bot trabaje ahí",
     ],
   },
@@ -81,4 +82,27 @@ export function ayuda(tema: string | undefined, esAdmin: boolean) {
     "",
     "💬 También me puedes escribir normal, p. ej. «hemos vendido 3 paneles al Bar Pepe, pagado por bizum». En el grupo, mencióname o responde a un mensaje mío. Antes de apuntar nada te pido que lo confirmes.",
   ].join("\n\n");
+}
+
+/** Lo básico en pocas líneas: para quien acaba de entrar como socio. */
+export function chuleta(bot: string) {
+  return [
+    "<b>Lo básico</b>",
+    "🏪 Al visitar un comercio: /visita Bar Pepe si (o no, o luego)",
+    "⭐ Al vender: /venta Bar Pepe 3 pagado bizum",
+    "💶 Dinero: /aporto 50, /gasto 30 imprenta, /retiro 100",
+    "📊 Cómo vamos: /caja, /embudo, /pendientes, /precios",
+    "↩️ Si te equivocas: /deshacer (10 minutos)",
+    `💬 O háblame normal mencionándome: «@${bot} hemos vendido 2 paneles al Bar Pepe»`,
+    "",
+    "Todo lo demás: /ayuda",
+  ].join("\n");
+}
+
+export const BIENVENIDA_DEFECTO =
+  "👋 ¡Bienvenido/a, {nombre}! Aquí llevamos todo el negocio de los paneles NFC: comercios visitados, ventas, caja y reparto. Yo lo apunto todo.";
+
+/** Bienvenida al entrar en el grupo (HTML ya escapado); `{nombre}` se sustituye por el nombre de la persona. */
+export function bienvenida(plantilla: string | null, nombre: string) {
+  return html(plantilla || BIENVENIDA_DEFECTO).replaceAll("{nombre}", `<b>${html(nombre)}</b>`);
 }

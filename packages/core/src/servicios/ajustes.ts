@@ -13,9 +13,11 @@ export interface Ajustes {
   /** Comisión para quien vende, sobre el total de cada venta cobrada (puntos básicos). */
   comisionBp: number;
   productoDefectoId: number | null;
+  /** Texto de bienvenida al grupo (null = el de por defecto). `{nombre}` = nombre de quien entra. */
+  bienvenida: string | null;
 }
 
-const DEFECTO: Ajustes = { grupoChatId: null, stockMin: 5, modoReparto: "igual", comisionBp: 0, productoDefectoId: null };
+const DEFECTO: Ajustes = { grupoChatId: null, stockMin: 5, modoReparto: "igual", comisionBp: 0, productoDefectoId: null, bienvenida: null };
 
 export async function leerAjustes(db: Tx): Promise<Ajustes> {
   const filas = await db.select().from(ajustes);
