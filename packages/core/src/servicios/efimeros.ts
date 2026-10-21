@@ -25,3 +25,8 @@ export async function efimerosVencidos(db: Tx, ahora = new Date()) {
 export async function olvidarEfimero(db: Tx, chatId: number, messageId: number) {
   await db.delete(efimeros).where(and(eq(efimeros.chatId, chatId), eq(efimeros.messageId, messageId)));
 }
+
+/** Saca de la lista todos los mensajes pendientes de borrarse en un chat (para borrarlos ya con /limpiar). */
+export async function vaciarEfimeros(db: Tx, chatId: number) {
+  return db.delete(efimeros).where(eq(efimeros.chatId, chatId)).returning({ chatId: efimeros.chatId, messageId: efimeros.messageId });
+}

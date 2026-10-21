@@ -71,6 +71,23 @@ Hecho todo el plan (F0–F6):
   con la URL de cada pegatina NFC). El carácter de control está duplicado en Python y en `servicios/placas.ts`.
 - Falta: verlo en el panel web (la API de la ficha ya devuelve `placas`).
 
+## v0.6.0 (2026-10-21): personalizar el chat
+- Ajustes nuevos (tabla `ajustes`, sin migración): `nombreAsistente`, `tono` (cercano/serio/gracioso), `emojis`,
+  `instruccionesIa` (≤ 500, se añaden al final del prompt sin cambiar las reglas) y `limpieza`
+  (`consultasMin`, `apuntesMin`, `erroresMin` 0–2820, `borrarComandos`, `consultasPorPrivado`). `leerAjustes` completa
+  `limpieza` con `LIMPIEZA_DEFECTO`.
+- `packages/core/src/estilo.ts` (también `@nfc/core/estilo` para la web): `frase(estilo, clave)` con las frases más vistas por
+  tono, `aplicarEstilo` (quita emojis) y `ejemploEstilo` (vista previa en Ajustes).
+- Bot: el middleware deja `ctx.ajustes`; `enviar()` aplica el estilo a todo lo que sale y decide el borrado por
+  `Respuesta.clase` (`consulta`/`apunte` según `ESCRITURA`, `error` en `correr`). Consultas y apuntes solo se borran en el
+  grupo; errores en cualquier chat. El modo privado manda la consulta entera por privado y deja un aviso de 1 min.
+  `/limpiar` (admin, grupo) usa `vaciarEfimeros`. El programador aplica el estilo a avisos, recordatorios y resumen (que
+  nunca se borran).
+- `/config nombre|tono|emojis|ia|limpieza`; `PUT /api/ajustes` valida los campos nuevos; Ajustes del panel con
+  «Personalidad del asistente» (vista previa) y «Limpieza del chat».
+- `borrarComandos` necesita que el bot sea admin del grupo con «Eliminar mensajes»; si no, Telegram lo rechaza sin más.
+- e2e: `LOGIN_RATE_LIMIT=100` en `playwright.config.ts` (con 14 tests se pasaba de 10 inicios/min).
+
 ## Pendiente (lo tiene que hacer el usuario)
 1. Crear el bot en @BotFather y poner `BOT_TOKEN` en el VPS (ver OPERACIONES). Desactivar *privacy mode* (`/setprivacy` → Disable)
    para que entienda frases en el grupo cuando le mencionan.

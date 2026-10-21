@@ -27,3 +27,12 @@ Lo que apuntes en el panel lo aviso en el grupo. ¿Móvil perdido? `/panel cerra
 
 Cada mañana a las 9:00 el bot te escribe por privado a quién te toca volver (ábrele un chat privado y pulsa Iniciar).
 Los lunes publica en el grupo el resumen de la semana.
+
+**Personalizar el bot** (admins, también en el panel → Ajustes):
+- Nombre y tono: `/config nombre Billetes`, `/config tono cercano|serio|gracioso`, `/config emojis no`
+- Notas para cuando le habláis normal: `/config ia responde en una línea`
+- Menos ruido en el grupo: `/config limpieza` enseña cómo está. Por ejemplo, `/config limpieza consultas 10` borra a los
+  10 minutos las respuestas a `/caja`, `/ventas`…; `/config limpieza privado si` contesta las consultas por privado.
+- Para que borre también vuestros mensajes (`/config limpieza comandos si`), haced al bot admin del grupo con permiso
+  «Eliminar mensajes» (en Telegram: grupo → Administradores → Añadir administrador).
+- `/limpiar` en el grupo borra ya lo que tenía pendiente.

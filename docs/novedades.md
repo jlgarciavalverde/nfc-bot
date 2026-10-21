@@ -3,6 +3,12 @@
 Lo que el bot anuncia en el grupo al actualizarse (`tools/deploy.mjs` publica la sección de la versión que despliega).
 Frases cortas, para los socios, sin tecnicismos.
 
+## 0.6.0
+- Ahora podéis darme personalidad: un nombre, un tono (cercano, serio o gracioso) y emojis sí o no. Se cambia en el panel (Ajustes) o con /config tono, /config nombre y /config emojis.
+- Notas para cuando me habláis normal, p. ej. «responde en una línea»: /config ia o en Ajustes. Lo que apunte os lo sigo pidiendo confirmar.
+- Menos ruido en el grupo: podéis elegir que las respuestas a consultas (/caja, /ventas…) y lo apuntado se borren solas al rato, que se borre también vuestro mensaje o que las consultas os las conteste por privado. /config limpieza o en Ajustes.
+- /limpiar (admin, en el grupo): borra ya lo que tenía pendiente de borrar.
+
 ## 0.5.1
 - En Placas → Nuevo lote, las instrucciones para fabricar las piezas del lote en el Mac están actualizadas.
 

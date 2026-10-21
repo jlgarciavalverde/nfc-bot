@@ -8,7 +8,8 @@
     ".": "./src/index.ts",
     "./testing": "./src/testing.ts",
     "./precios": "./src/precios.ts",
-    "./texto": "./src/texto.ts"
+    "./texto": "./src/texto.ts",
+    "./estilo": "./src/estilo.ts"
   },
   "scripts": {
     "typecheck": "tsc -p .",

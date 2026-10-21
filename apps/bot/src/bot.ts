@@ -3,7 +3,7 @@ import type { InlineKeyboardButton, UserFromGetMe } from "grammy/types";
 import { and, eq, gt, isNull, sql } from "drizzle-orm";
 import {
   altaSocio, cerrarSesionesDe, crearEnlacePanel, deshacerUltima, olvidarEfimero, programarBorrado, ErrorNegocio, guardarAjuste, haySocios, hoy as hoyMadrid, html, leerAjustes,
-  listarProductos, marcarHecho, nombresComercios, recientesDeSocio, socioPorTelegram, tablas, MINUTOS_ENLACE, type DB, type Socio,
+  listarProductos, marcarHecho, aplicarEstilo, estiloDe, frase, vaciarEfimeros, type Ajustes, nombresComercios, recientesDeSocio, socioPorTelegram, tablas, plural, MINUTOS_ENLACE, type DB, type Socio,
 } from "@nfc/core";
 import type { BotConfig } from "./config";
 import type { Accion } from "./acciones";
@@ -19,10 +19,10 @@ export interface Deps {
   now?: () => Date;
 }
 
-type Ctx = Context & { socio: Socio | null; grupoId: number | null };
+type Ctx = Context & { socio: Socio | null; grupoId: number | null; ajustes: Ajustes };
 
 /** Comandos que no son una Accion (los gestiona el propio bot). */
-const ESPECIALES = new Set(["start", "vincular", "unirme", "deshacer", "panel", "ia", "id"]);
+const ESPECIALES = new Set(["start", "vincular", "unirme", "deshacer", "panel", "ia", "id", "limpiar"]);
 
 const MAX = 4000;
 /** Telegram admite 4096 caracteres por mensaje: se corta por líneas. */
@@ -41,7 +41,8 @@ export function trocear(texto: string) {
   return out;
 }
 
-const teclado = (r: Respuesta) => (r.botones?.length ? InlineKeyboard.from(r.botones.map((fila) => fila.map((x) => InlineKeyboard.text(x.texto.slice(0, 60), x.data)))) : undefined);
+const teclado = (r: Respuesta, estilo: (t: string) => string) =>
+  r.botones?.length ? InlineKeyboard.from(r.botones.map((fila) => fila.map((x) => InlineKeyboard.text(estilo(x.texto).slice(0, 60) || x.texto.slice(0, 60), x.data)))) : undefined;
 
 export function crearBot(deps: Deps, botInfo?: UserFromGetMe) {
   const { db, config } = deps;
@@ -55,42 +56,66 @@ export function crearBot(deps: Deps, botInfo?: UserFromGetMe) {
   }
 
   async function enviar(ctx: Ctx, r: Respuesta) {
-    const trozos = trocear(r.texto);
+    const aj = ctx.ajustes;
+    const estilo = (t: string) => aplicarEstilo(t, aj);
+    const lim = aj.limpieza;
+    const enGrupo = ctx.chat?.type !== "private";
+    // Modo silencioso: las consultas hechas en el grupo, por privado (si nunca ha abierto el privado, aquí como siempre)
+    if (enGrupo && lim.consultasPorPrivado && r.clase === "consulta" && ctx.from) {
+      const ok = await mandar(ctx.from.id, { ...r, efimero: undefined }, estilo).then(() => true, () => false);
+      if (ok) {
+        await enviar(ctx, { texto: frase(estiloDe(aj), "privado"), efimero: 60_000 });
+        return;
+      }
+    }
     // Las preguntas con «Confirmar/Cancelar» que nadie contesta se borran al caducar
     const conPregunta = r.botones?.some((f) => f.some((b) => /^(ok|no):/.test(b.data)));
-    const efimero = r.efimero ?? (conPregunta ? MINUTOS_PENDIENTE * 60_000 : undefined);
+    const porClase = r.clase === "error" ? lim.erroresMin : !enGrupo ? 0 : r.clase === "consulta" ? lim.consultasMin : r.clase === "apunte" ? lim.apuntesMin : 0;
+    const efimero = r.efimero ?? (conPregunta ? MINUTOS_PENDIENTE * 60_000 : porClase ? porClase * 60_000 : undefined);
+    const trozos = trocear(estilo(r.texto));
     for (const [i, t] of trozos.entries()) {
       const m = await ctx.reply(t, {
         parse_mode: "HTML",
         link_preview_options: { is_disabled: true },
-        reply_markup: i === trozos.length - 1 ? teclado(r) : undefined,
-        reply_parameters: ctx.chat?.type !== "private" && ctx.msg?.message_id && i === 0 ? { message_id: ctx.msg.message_id, allow_sending_without_reply: true } : undefined,
+        reply_markup: i === trozos.length - 1 ? teclado(r, estilo) : undefined,
+        reply_parameters: enGrupo && ctx.msg?.message_id && i === 0 ? { message_id: ctx.msg.message_id, allow_sending_without_reply: true } : undefined,
       });
       if (efimero && m?.chat) await borrarLuego(m.chat.id, m.message_id, efimero);
     }
-    if (r.grupo && ctx.grupoId) await ctx.api.sendMessage(ctx.grupoId, r.grupo, { parse_mode: "HTML" });
+    // El mensaje del socio se va con la respuesta (solo mensajes escritos, no botones; hace falta que el bot sea admin)
+    if (enGrupo && efimero && lim.borrarComandos && ctx.message && ctx.chat) await borrarLuego(ctx.chat.id, ctx.message.message_id, efimero);
+    if (r.grupo && ctx.grupoId) await ctx.api.sendMessage(ctx.grupoId, estilo(r.grupo), { parse_mode: "HTML" });
     // Si nunca ha abierto el chat privado con el bot, Telegram no deja escribirle: no pasa nada
-    if (r.privado) await ctx.api.sendMessage(r.privado.telegramId, r.privado.texto, { parse_mode: "HTML", link_preview_options: { is_disabled: true } }).catch(() => {});
+    if (r.privado) await ctx.api.sendMessage(r.privado.telegramId, estilo(r.privado.texto), { parse_mode: "HTML", link_preview_options: { is_disabled: true } }).catch(() => {});
+  }
+
+  /** Respuesta entera por privado (falla si esa persona no ha abierto nunca el chat con el bot). */
+  async function mandar(chatId: number, r: Respuesta, estilo: (t: string) => string) {
+    const trozos = trocear(estilo(r.texto));
+    for (const [i, t] of trozos.entries()) {
+      await bot.api.sendMessage(chatId, t, { parse_mode: "HTML", link_preview_options: { is_disabled: true }, reply_markup: i === trozos.length - 1 ? teclado(r, estilo) : undefined });
+    }
   }
 
   async function correr(ctx: Ctx, f: () => Promise<Respuesta>) {
     try {
       await enviar(ctx, await f());
     } catch (e) {
-      if (e instanceof ErrorNegocio || e instanceof ErrorIa) return enviar(ctx, { texto: `⚠️ ${html(e.message)}`, efimero: 5 * 60_000 });
+      if (e instanceof ErrorNegocio || e instanceof ErrorIa) return enviar(ctx, { texto: `⚠️ ${html(e.message)}`, clase: "error" });
       console.error("Error en el bot", e);
-      await enviar(ctx, { texto: "😵 Algo ha fallado por mi parte. Si se repite, avisa a quien mantiene el bot." }).catch(() => {});
+      await enviar(ctx, { texto: frase(estiloDe(ctx.ajustes), "fallo") }).catch(() => {});
     }
   }
 
-  const contexto = (ctx: Ctx, origen: "bot" | "ia" = "bot") => ({ db, socio: ctx.socio!, hoy: hoyMadrid(ahora()), origen, botUsername: ctx.me.username });
+  const contexto = (ctx: Ctx, origen: "bot" | "ia" = "bot") => ({ db, socio: ctx.socio!, hoy: hoyMadrid(ahora()), origen, botUsername: ctx.me.username, estilo: estiloDe(ctx.ajustes) });
 
   // ── Quién escribe y desde dónde ──
   bot.use(async (ctx, next) => {
     const from = ctx.from;
     if (!from || from.is_bot) return;
     ctx.socio = await socioPorTelegram(db, from.id);
-    ctx.grupoId = (await leerAjustes(db)).grupoChatId;
+    ctx.ajustes = await leerAjustes(db);
+    ctx.grupoId = ctx.ajustes.grupoChatId;
     const chat = ctx.chat;
     // «Quiero ser socio» de la bienvenida: lo puede pulsar cualquiera del grupo vinculado
     if (ctx.callbackQuery?.data === "unirme" && chat?.id === ctx.grupoId) return next();
@@ -115,7 +140,12 @@ export function crearBot(deps: Deps, botInfo?: UserFromGetMe) {
 
   bot.command("start", async (ctx) => {
     if (ctx.chat.type !== "private") return;
-    if (ctx.socio) return correr(ctx, () => ejecutar(contexto(ctx), { t: "ayuda" }));
+    if (ctx.socio) {
+      return correr(ctx, async () => {
+        const r = await ejecutar(contexto(ctx), { t: "ayuda" });
+        return { ...r, texto: `${frase(estiloDe(ctx.ajustes), "saludo", { nombre: html(ctx.socio!.nombre) })}\n\n${r.texto}` };
+      });
+    }
     const codigo = ctx.match.trim();
     if (!config.setupCode || codigo !== config.setupCode || (await haySocios(db))) {
       // Alguien del grupo que abre el chat privado antes de que le aprueben
@@ -159,12 +189,12 @@ export function crearBot(deps: Deps, botInfo?: UserFromGetMe) {
 
   bot.command("unirme", async (ctx) => {
     if (ctx.chat.id !== ctx.grupoId) return;
-    if (ctx.socio) return enviar(ctx, { texto: "Ya eres socio. 😉", efimero: 60_000 });
+    if (ctx.socio) return enviar(ctx, { texto: frase(estiloDe(ctx.ajustes), "yaSocio"), efimero: 60_000 });
     await pedirAlta(ctx);
   });
 
   bot.callbackQuery("unirme", async (ctx) => {
-    if (ctx.socio) return ctx.answerCallbackQuery({ text: "Ya eres socio. 😉", show_alert: true });
+    if (ctx.socio) return ctx.answerCallbackQuery({ text: aplicarEstilo(frase(estiloDe(ctx.ajustes), "yaSocio"), ctx.ajustes), show_alert: true });
     await ctx.answerCallbackQuery();
     await pedirAlta(ctx);
   });
@@ -172,7 +202,7 @@ export function crearBot(deps: Deps, botInfo?: UserFromGetMe) {
   // ── Bienvenida al entrar en el grupo ──
   bot.on("message:new_chat_members", async (ctx) => {
     if (ctx.chat.id !== ctx.grupoId) return;
-    const { bienvenida: plantilla } = await leerAjustes(db);
+    const { bienvenida: plantilla, nombreAsistente } = ctx.ajustes;
     for (const u of ctx.message.new_chat_members) {
       if (u.is_bot) continue;
       const nombre = [u.first_name, u.last_name].filter(Boolean).join(" ");
@@ -180,7 +210,7 @@ export function crearBot(deps: Deps, botInfo?: UserFromGetMe) {
       const texto = yaSocio
         ? `👋 ¡Hola otra vez, <b>${html(nombre)}</b>! Sigues siendo socio.\n\n${chuleta(ctx.me.username)}`
         : [
-            bienvenida(plantilla, nombre),
+            bienvenida(plantilla, nombre, nombreAsistente),
             "",
             "Para empezar:",
             "1. Pulsa «Quiero ser socio» y un admin te aprueba.",
@@ -190,7 +220,7 @@ export function crearBot(deps: Deps, botInfo?: UserFromGetMe) {
           ].join("\n");
       const botones: InlineKeyboardButton[][] = yaSocio ? [] : [[{ text: "🙋 Quiero ser socio", callback_data: "unirme" }]];
       botones.push([{ text: "💬 Abrir chat privado", url: `https://t.me/${ctx.me.username}?start=hola` }]);
-      await ctx.reply(texto, { parse_mode: "HTML", link_preview_options: { is_disabled: true }, reply_markup: { inline_keyboard: botones } });
+      await ctx.reply(aplicarEstilo(texto, ctx.ajustes), { parse_mode: "HTML", link_preview_options: { is_disabled: true }, reply_markup: { inline_keyboard: botones } });
     }
   });
 
@@ -219,16 +249,28 @@ export function crearBot(deps: Deps, botInfo?: UserFromGetMe) {
       `<i>Este mensaje se borra solo en ${MINUTOS_ENLACE} minutos.</i>`,
     ].join("\n");
     try {
-      const m = await ctx.api.sendMessage(ctx.from!.id, texto, { parse_mode: "HTML", link_preview_options: { is_disabled: true } });
+      const m = await ctx.api.sendMessage(ctx.from!.id, aplicarEstilo(texto, ctx.ajustes), { parse_mode: "HTML", link_preview_options: { is_disabled: true } });
       // Un solo mensaje de acceso a la vez: el nuevo borra los anteriores; y desaparece al caducar
       await borrarLuego(m.chat.id, m.message_id, MINUTOS_ENLACE * 60_000, `panel:${ctx.socio!.id}`);
-      if (ctx.chat.type !== "private") await enviar(ctx, { texto: "Te lo he mandado por privado. 📬", efimero: 60_000 });
+      if (ctx.chat.type !== "private") await enviar(ctx, { texto: frase(estiloDe(ctx.ajustes), "privado"), efimero: 60_000 });
     } catch {
       await enviar(ctx, { texto: "No puedo escribirte por privado: ábreme un chat, pulsa Iniciar y vuelve a pedir /panel.", efimero: 5 * 60_000 });
     }
   });
 
   bot.command("ia", (ctx) => lenguajeNatural(ctx, ctx.match));
+
+  // Borra ya los mensajes del bot que estaban pendientes de borrarse en el grupo (y el propio /limpiar)
+  bot.command("limpiar", async (ctx) => {
+    if (ctx.chat.type === "private") return enviar(ctx, { texto: "/limpiar se usa en el grupo.", efimero: 60_000 });
+    if (ctx.socio?.rol !== "admin") return enviar(ctx, { texto: "⚠️ Eso solo lo puede hacer un admin.", clase: "error" });
+    const ms = await vaciarEfimeros(db, ctx.chat.id);
+    let n = 0;
+    for (const m of ms) if (await bot.api.deleteMessage(m.chatId, m.messageId).then(() => true, () => false)) n++;
+    await ctx.deleteMessage().catch(() => {});
+    const m = await ctx.reply(aplicarEstilo(n ? `🧹 He borrado ${plural(n, "mensaje", "mensajes")}.` : "🧹 No tenía nada pendiente de borrar.", ctx.ajustes));
+    await borrarLuego(m.chat.id, m.message_id, 30_000);
+  });
 
   // ── Resto de comandos ──
   bot.on("message:text", async (ctx, next) => {
@@ -273,8 +315,11 @@ export function crearBot(deps: Deps, botInfo?: UserFromGetMe) {
         socio: ctx.socio!.nombre,
         comercios: await nombresComercios(db),
         productos: (await listarProductos(db)).map((p) => p.nombre),
+        tono: ctx.ajustes.tono,
+        nombreAsistente: ctx.ajustes.nombreAsistente,
+        instruccionesIa: ctx.ajustes.instruccionesIa,
       });
-      if (!r.ok) return { texto: `🤔 ${html(r.respuesta)}` };
+      if (!r.ok) return { texto: `🤔 ${html(r.respuesta)}`, clase: "consulta" };
       return ejecutar(contexto(ctx, "ia"), r.accion);
     });
   }
@@ -307,8 +352,8 @@ export function crearBot(deps: Deps, botInfo?: UserFromGetMe) {
         return;
       }
       if (tipo !== "ok" && tipo !== "no") return ctx.answerCallbackQuery();
-      const r = await resolverPendiente({ db, socio: ctx.socio!, hoy: hoyMadrid(ahora()), botUsername: ctx.me.username }, id, tipo === "ok");
-      await ctx.answerCallbackQuery(tipo === "no" ? { text: "Cancelado" } : undefined);
+      const r = await resolverPendiente({ db, socio: ctx.socio!, hoy: hoyMadrid(ahora()), botUsername: ctx.me.username, estilo: estiloDe(ctx.ajustes) }, id, tipo === "ok");
+      await ctx.answerCallbackQuery(tipo === "no" ? { text: aplicarEstilo(r.texto, ctx.ajustes).replace(/\.$/, "") } : undefined);
       // La pregunta ya no sirve: se borra (si Telegram no deja, al menos se le quitan los botones)
       const msg = ctx.callbackQuery.message;
       const borrada = msg ? await ctx.deleteMessage().then(() => true, () => false) : false;

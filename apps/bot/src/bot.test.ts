@@ -312,3 +312,77 @@ describe("placas", () => {
     expect(textos(await escribir(BEA, GRUPO, "/placas"))[0]).toContain("Aún no hay placas asignadas");
   });
 });
+
+describe("personalización del chat", () => {
+  const programados = () => db.select().from(tablas.efimeros);
+
+  it("tono, nombre y emojis: cambian lo que dice el bot (solo admin)", async () => {
+    await montar();
+    expect(textos(await escribir(ANA, GRUPO, "/config tono serio"))[0]).toContain("Tono: <b>Serio</b>");
+    expect(textos(await escribir(ANA, ANA, "/pendientes"))[0]).toBe("Sin pendientes en los próximos 7 días.");
+    await escribir(ANA, GRUPO, "/config nombre Billetes");
+    expect(textos(await escribir(ANA, ANA, "/start"))[0]).toMatch(/^Hola, Ana\. Soy Billetes\./);
+    await escribir(ANA, GRUPO, "/config tono gracioso");
+    expect(textos(await escribir(ANA, GRUPO, "/venta Bar Pepe 1 pagado bizum"))[0]).toContain("¿Lo creo y sigo?");
+    expect(textos(await escribir(ANA, GRUPO, "/config emojis no"))[0]).toBe("Sin emojis a partir de ahora.");
+    const r = await escribir(ANA, ANA, "/precio 3");
+    expect(textos(r)[0]).not.toMatch(/\p{Extended_Pictographic}/u);
+    expect(textos(await escribir(BEA, GRUPO, "/config tono cercano"))[0]).toContain("solo lo puede hacer un admin");
+    expect((await leerAjustes(db)).tono).toBe("gracioso");
+    expect(textos(await escribir(ANA, GRUPO, "/config tono pirata"))[0]).toContain("Tonos:");
+  });
+
+  it("limpieza: consultas del grupo se programan para borrarse (con el mensaje del socio); en privado no", async () => {
+    await montar();
+    await vaciarEfimeros();
+    expect(textos(await escribir(ANA, GRUPO, "/config limpieza consultas 10"))[0]).toContain("se borran a los 10 minutos");
+    await vaciarEfimeros();
+    await escribir(BEA, BEA, "/caja");
+    expect(await programados()).toHaveLength(0);
+    await escribir(BEA, GRUPO, "/caja");
+    expect(await programados()).toHaveLength(1);
+    await escribir(ANA, GRUPO, "/config limpieza comandos si");
+    await vaciarEfimeros();
+    await escribir(BEA, GRUPO, "/caja");
+    expect(await programados()).toHaveLength(2);
+    // Los apuntes no (apuntesMin = 0)
+    await vaciarEfimeros();
+    await escribir(BEA, GRUPO, "/nuevo Bar Pepe");
+    expect(await programados()).toHaveLength(0);
+    expect(textos(await escribir(ANA, GRUPO, "/config limpieza errores 3000"))[0]).toContain("como mucho");
+  });
+
+  it("modo privado: la consulta va por privado y en el grupo solo queda el aviso", async () => {
+    await montar();
+    await escribir(ANA, GRUPO, "/config limpieza privado si");
+    const r = await escribir(BEA, GRUPO, "/caja");
+    const envios = r.filter((l) => l.method === "sendMessage");
+    expect(envios[0]!.payload.chat_id).toBe(BEA);
+    expect(envios[0]!.payload.text).toContain("Caja");
+    expect(envios[1]!.payload).toMatchObject({ chat_id: GRUPO });
+    expect(envios[1]!.payload.text).toContain("por privado");
+    // Lo apuntado sigue en el grupo
+    expect((await escribir(BEA, GRUPO, "/nuevo Bar Pepe")).find((l) => l.method === "sendMessage")!.payload.chat_id).toBe(GRUPO);
+  });
+
+  it("/limpiar borra ya lo pendiente (solo admin, en el grupo); el resumen de los lunes no se programa nunca", async () => {
+    await montar();
+    await escribir(ANA, GRUPO, "/config limpieza consultas 60");
+    await escribir(BEA, GRUPO, "/caja");
+    await escribir(BEA, GRUPO, "/stock");
+    expect(textos(await escribir(BEA, GRUPO, "/limpiar"))[0]).toContain("solo lo puede hacer un admin");
+    const antes = (await programados()).filter((e) => e.chatId === GRUPO).length;
+    const r = await escribir(ANA, GRUPO, "/limpiar");
+    expect(r.filter((l) => l.method === "deleteMessage").length).toBeGreaterThanOrEqual(antes);
+    expect(textos(r)[0]).toMatch(/He borrado \d+ mensajes/);
+    expect((await programados()).filter((e) => e.chatId === GRUPO && e.borrarAt.getTime() > Date.now() + 60_000)).toHaveLength(0);
+    await vaciarEfimeros();
+    const api = { sendMessage: async () => ({ message_id: 5 }) as never };
+    await tick(db, api as never, new Date("2026-10-26T08:00:00Z"));
+    expect(await programados()).toHaveLength(0);
+  });
+
+  async function vaciarEfimeros() {
+    await db.delete(tablas.efimeros);
+  }
+});

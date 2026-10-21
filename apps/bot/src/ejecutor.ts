@@ -1,11 +1,11 @@
 import { and, eq, gt, isNull, sql } from "drizzle-orm";
 import {
-  altaSocio, apuntarMovimiento, asignarPlaca, infoPlaca, normalizarCodigo, listarPlacas, quitarPlaca, avisar, TIPOS_AVISO, buscarComercio, cambiarDatoComercio, cambiarPrecio, cambiarSocio, comercioPorId, comprarLote,
+  altaSocio, apuntarMovimiento, asignarPlaca, infoPlaca, normalizar, normalizarCodigo, listarPlacas, quitarPlaca, avisar, TIPOS_AVISO, buscarComercio, cambiarDatoComercio, cambiarPrecio, cambiarSocio, comercioPorId, comprarLote,
   crearComercio, crearOferta, crearProducto, crearRecordatorio, describirOferta, embudo, ErrorNegocio, ESTADOS, estadoStock, euros,
   fechaCorta, fichaComercio, guardarAjuste, guardarTramo, borrarTramo, html, leerAjustes, listarComercios, listarMovimientos,
   listarProductos, listarSocios, listarVentas, marcarCobrada, ofertasDe, parsePorcentaje, pct, plural, ponerUbicacion,
   presupuesto, quitarOferta, recordatoriosPendientes, registrarVenta, registrarVisita, reparto, resolverProducto, resumenCaja,
-  socioPorNombre, sumarDias, sumarMeses, tablas, tramosDe, DIAS_LUEGO, type Comercio, type DB, type ModoReparto, type Socio,
+  socioPorNombre, sumarDias, frase, ESTILO_DEFECTO, MAX_MIN_LIMPIEZA, TONOS, type Estilo, type Limpieza, type Tono, sumarMeses, tablas, tramosDe, DIAS_LUEGO, type Comercio, type DB, type ModoReparto, type Socio,
 } from "@nfc/core";
 import { Accion, ESCRITURA, SOLO_ADMIN } from "./acciones";
 import { ayuda, bienvenida, chuleta } from "./ayuda";
@@ -24,6 +24,8 @@ export interface Respuesta {
   privado?: { telegramId: number; texto: string };
   /** Borrar el mensaje solo pasados estos ms (errores, avisos de un momento). */
   efimero?: number;
+  /** Para la limpieza del chat (`/config limpieza`): cada clase se borra a su tiempo. */
+  clase?: "consulta" | "apunte" | "error";
 }
 export interface Contexto {
   db: DB;
@@ -33,6 +35,8 @@ export interface Contexto {
   origen: "bot" | "ia";
   /** @usuario del bot (para los ejemplos de la chuleta). */
   botUsername?: string;
+  /** Tono y emojis (`/config tono`); si falta, el de por defecto. */
+  estilo?: Estilo;
 }
 
 /** Lo que guarda una acción pendiente de confirmar. */
@@ -77,7 +81,7 @@ export async function resolverPendiente(ctx: Omit<Contexto, "origen">, id: numbe
     await tx.update(pendientes).set({ resueltaAt: new Date() }).where(and(isNull(pendientes.resueltaAt), sql`${pendientes.accion}->>'lote' = ${datos.lote}`));
     return datos;
   });
-  if (!aceptar) return { texto: "Cancelado." };
+  if (!aceptar) return { texto: frase(ctx.estilo ?? ESTILO_DEFECTO, "cancelado") };
   const c: Contexto = { ...ctx, origen: "bot" };
   let a = p.a;
   if (p.crear) {
@@ -150,11 +154,16 @@ export async function ejecutar(ctx: Contexto, entrada: Accion): Promise<Respuest
     if ("comercio" in a) {
       const c = await comercioDe(ctx, a, a.t === "visita" || a.t === "venta");
       if (esRespuesta(c)) return c;
-      return proponer(ctx, `${await describir(ctx, { ...a, comercio: c.id } as Accion)}\n¿Lo apunto?`, [{ etiqueta: "✅ Confirmar", p: { a: { ...a, comercio: c.id } as Accion } }]);
+      return proponer(ctx, `${await describir(ctx, { ...a, comercio: c.id } as Accion)}\n${frase(ctx.estilo ?? ESTILO_DEFECTO, "confirmar")}`, [{ etiqueta: "✅ Confirmar", p: { a: { ...a, comercio: c.id } as Accion } }]);
     }
-    return proponer(ctx, `${await describir(ctx, a)}\n¿Lo apunto?`, [{ etiqueta: "✅ Confirmar", p: { a } }]);
+    return proponer(ctx, `${await describir(ctx, a)}\n${frase(ctx.estilo ?? ESTILO_DEFECTO, "confirmar")}`, [{ etiqueta: "✅ Confirmar", p: { a } }]);
   }
+  return { clase: ESCRITURA.has(a.t) ? "apunte" : "consulta", ...(await hacer(ctx, a)) };
+}
+
+async function hacer(ctx: Contexto, a: Accion): Promise<Respuesta> {
   const { db, socio, hoy } = ctx;
+  const estilo = ctx.estilo ?? ESTILO_DEFECTO;
 
   switch (a.t) {
     case "ayuda":
@@ -234,7 +243,7 @@ export async function ejecutar(ctx: Contexto, entrada: Accion): Promise<Respuest
     }
     case "ventas": {
       const vs = await listarVentas(db, { limite: 20, pendientes: a.pendientes });
-      if (!vs.length) return { texto: a.pendientes ? "No hay nada pendiente de cobro. 👌" : "Aún no hay ventas." };
+      if (!vs.length) return { texto: a.pendientes ? frase(estilo, "sinCobros") : "Aún no hay ventas." };
       const total = vs.reduce((x, v) => x + v.totalCent, 0);
       return {
         texto: [
@@ -251,7 +260,7 @@ export async function ejecutar(ctx: Contexto, entrada: Accion): Promise<Respuest
     }
     case "pendientes": {
       const rs = await recordatoriosPendientes(db, sumarDias(hoy, 7), a.todos ? undefined : socio.id);
-      if (!rs.length) return { texto: "No tienes nada pendiente para los próximos 7 días. 👌" };
+      if (!rs.length) return { texto: frase(estilo, "nadaPendiente") };
       return {
         texto: [b(a.todos ? "Pendientes de todos (7 días)" : "Tus pendientes (7 días)"), ...rs.map((r) => `${r.fecha <= hoy ? "🔔" : "🗓"} ${fechaCorta(r.fecha)} ${html(r.comercio)}${a.todos ? ` (${html(r.socio)})` : ""}${r.nota ? ` — ${html(r.nota)}` : ""}`)].join("\n"),
         botones: rs.filter((r) => r.fecha <= hoy && r.socioId === socio.id).slice(0, 8).map((r) => [{ texto: `✅ Hecho: ${r.comercio}`, data: `hecho:${r.id}` }]),
@@ -336,7 +345,7 @@ export async function ejecutar(ctx: Contexto, entrada: Accion): Promise<Respuest
       const l = [`${ICONO_RESULTADO[a.resultado]} Visita a ${b(c.nombre)} apuntada.`];
       if (r.comercio.estado !== c.estado) l.push(`Estado: ${ESTADOS[c.estado]} → ${b(ESTADOS[r.comercio.estado])}`);
       if (r.proxima) l.push(`⏰ Te lo recuerdo el ${b(fechaCorta(r.proxima))}${!a.proxima ? ` (en ${DIAS_LUEGO} días; cámbialo con /recordar ${html(c.nombre)} el lunes)` : ""}.`);
-      if (a.resultado === "si") l.push(`Cuando se cierre: /venta ${html(c.nombre)} 1 pagado bizum`);
+      if (a.resultado === "si") l.push(...[frase(estilo, "visitaSi")].filter(Boolean), `Cuando se cierre: /venta ${html(c.nombre)} 1 pagado bizum`);
       return { texto: l.join("\n") };
     }
     case "venta": {
@@ -348,6 +357,7 @@ export async function ejecutar(ctx: Contexto, entrada: Accion): Promise<Respuest
       const l = [`⭐ Venta ${b(`#${v.id}`)} a ${b(c.nombre)}: ${plural(v.uds, producto.nombre, producto.nombre)} por ${b(euros(v.totalCent))}`, html(v.aplicado)];
       l.push(v.cobrada ? `✅ Cobrada${v.metodo ? ` por ${v.metodo}` : ""}` : `⏳ Pendiente de cobro. Cuando paguen: /cobrado ${v.id} bizum`);
       if (v.costeCent != null) l.push(`Margen: ${euros(v.totalCent - v.costeCent)}`);
+      if (frase(estilo, "venta")) l.push(frase(estilo, "venta"));
       // El aviso de stock bajo va al grupo por el buzón de avisos (se puede silenciar con /config avisos stock no)
       if (v.costeCent != null) {
         const { stockMin } = await leerAjustes(db);
@@ -494,9 +504,74 @@ async function configurar(ctx: Contexto, a: Extract<Accion, { t: "config" }>): P
     case "bienvenida": {
       const t = a.valor.trim();
       await guardarAjuste(db, "bienvenida", t || null);
-      return { texto: `${t ? "Bienvenida cambiada" : "Bienvenida por defecto"}. Así la verá quien entre:\n\n${bienvenida(t || null, socio.nombre)}` };
+      return { texto: `${t ? "Bienvenida cambiada" : "Bienvenida por defecto"}. Así la verá quien entre:\n\n${bienvenida(t || null, socio.nombre, (await leerAjustes(db)).nombreAsistente)}` };
     }
+    case "nombre": {
+      if (v.length > 40) throw new ErrorNegocio("El nombre, como mucho de 40 letras.");
+      await guardarAjuste(db, "nombreAsistente", v || null);
+      return { texto: v ? `Desde ahora me presento como ${b(v)}.` : "Vuelvo a presentarme como «el asistente del negocio»." };
+    }
+    case "tono": {
+      const tonos = Object.keys(TONOS) as Tono[];
+      const t = tonos.find((x) => x === normalizar(v));
+      if (v && !t) throw new ErrorNegocio(`Tonos: ${tonos.join(", ")}.`);
+      if (t) await guardarAjuste(db, "tono", t);
+      const actual = t ?? (await leerAjustes(db)).tono;
+      const e = { ...(ctx.estilo ?? ESTILO_DEFECTO), tono: actual };
+      return { texto: [`Tono: ${b(TONOS[actual].texto)} (${TONOS[actual].detalle.toLowerCase()}).`, "", "Así sueno:", frase(e, "saludo", { nombre: html(socio.nombre) }), frase(e, "nadaPendiente"), "", `Cambiar: /config tono ${tonos.join("|")}`].join("\n") };
+    }
+    case "emojis": {
+      const n = normalizar(v);
+      if (!["si", "no"].includes(n)) throw new ErrorNegocio("Así: /config emojis si|no");
+      await guardarAjuste(db, "emojis", n === "si");
+      return { texto: n === "si" ? "😄 Vuelvo a usar emojis." : "Sin emojis a partir de ahora." };
+    }
+    case "ia": {
+      if (v.length > 500) throw new ErrorNegocio("Las notas para la IA, como mucho de 500 letras.");
+      await guardarAjuste(db, "instruccionesIa", v || null);
+      return { texto: v ? `Notas para la IA guardadas. Las tendré en cuenta al contestar (no cambian lo que puedo hacer ni que pida confirmación):\n<i>${html(v)}</i>` : "Notas para la IA quitadas." };
+    }
+    case "limpieza":
+      return configurarLimpieza(ctx, v);
   }
+}
+
+const NOMBRES_LIMPIEZA: Record<string, keyof Limpieza> = { consultas: "consultasMin", apuntes: "apuntesMin", errores: "erroresMin", comandos: "borrarComandos", privado: "consultasPorPrivado" };
+
+const minutos = (n: number) => (!n ? "nunca" : n % 1440 === 0 ? plural(n / 1440, "día", "días") : n % 60 === 0 ? plural(n / 60, "hora", "horas") : plural(n, "minuto", "minutos"));
+
+async function configurarLimpieza(ctx: Contexto, v: string): Promise<Respuesta> {
+  const { db } = ctx;
+  let { limpieza: l } = await leerAjustes(db);
+  const [que, valor = ""] = normalizar(v).split(" ");
+  if (que) {
+    const k = NOMBRES_LIMPIEZA[que];
+    if (!k) throw new ErrorNegocio(`Así: /config limpieza ${Object.keys(NOMBRES_LIMPIEZA).join("|")} …`);
+    if (k === "borrarComandos" || k === "consultasPorPrivado") {
+      if (!["si", "no"].includes(valor)) throw new ErrorNegocio(`Así: /config limpieza ${que} si|no`);
+      l = { ...l, [k]: valor === "si" };
+    } else {
+      const n = valor === "nunca" ? 0 : Number(valor);
+      if (!Number.isInteger(n) || n < 0 || n > MAX_MIN_LIMPIEZA) throw new ErrorNegocio(`Así: /config limpieza ${que} 10 (minutos; 0 = nunca; como mucho ${MAX_MIN_LIMPIEZA}, porque Telegram no deja borrar mensajes de más de 48 h)`);
+      l = { ...l, [k]: n };
+    }
+    await guardarAjuste(db, "limpieza", l);
+  }
+  return {
+    texto: [
+      b("Limpieza del chat"),
+      `🔎 Respuestas a consultas en el grupo (/caja, /ventas…): se borran ${l.consultasMin ? `a los ${minutos(l.consultasMin)}` : "nunca"}`,
+      `✍️ Confirmaciones de lo apuntado en el grupo: ${l.apuntesMin ? `a los ${minutos(l.apuntesMin)}` : "nunca"}`,
+      `⚠️ Errores: ${l.erroresMin ? `a los ${minutos(l.erroresMin)}` : "nunca"}`,
+      `🧹 Borrar también el mensaje del socio: ${l.borrarComandos ? "sí" : "no"}${l.borrarComandos ? " (tengo que ser admin del grupo con permiso «Eliminar mensajes»)" : ""}`,
+      `📬 Contestar las consultas por privado: ${l.consultasPorPrivado ? "sí" : "no"}`,
+      "",
+      "Nunca borro el resumen de los lunes, los avisos, las bienvenidas ni las ventas anunciadas al grupo.",
+      "",
+      "Cambiar: /config limpieza consultas 10 · apuntes 60 · errores 5 · comandos si · privado si",
+      "Borrar ya lo que tengo pendiente de borrar: /limpiar (en el grupo)",
+    ].join("\n"),
+  };
 }
 
 /** Para el botón de recordatorio hecho. */

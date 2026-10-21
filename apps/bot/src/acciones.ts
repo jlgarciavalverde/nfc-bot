@@ -65,7 +65,7 @@ export const Accion = z.discriminatedUnion("t", [
     hasta: fecha.optional(),
   }),
   z.object({ t: z.literal("quitarOferta"), id: z.number().int().positive() }),
-  z.object({ t: z.literal("config"), clave: z.enum(["reparto", "comision", "porcentaje", "stock", "admin", "socio", "baja", "producto", "bienvenida", "avisos"]), socio: z.string().optional(), valor: z.string().max(1000) }),
+  z.object({ t: z.literal("config"), clave: z.enum(["reparto", "comision", "porcentaje", "stock", "admin", "socio", "baja", "producto", "bienvenida", "avisos", "nombre", "tono", "emojis", "ia", "limpieza"]), socio: z.string().optional(), valor: z.string().max(1000) }),
   z.object({ t: z.literal("alta"), telegramId: z.number().int(), nombre: z.string().max(120), username: z.string().max(64).nullable().optional() }),
 ]);
 export type Accion = z.infer<typeof Accion>;

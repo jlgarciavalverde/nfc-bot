@@ -213,6 +213,36 @@ test("admin: tramo de precio y ajustes con aviso de cambios sin guardar", async 
   await expect(page.getByRole("status").getByText("Ajustes guardados")).toBeVisible();
 });
 
+for (const esquema of ["light", "dark"] as const) {
+  test(`admin: personalidad del asistente y limpieza del chat (${esquema})`, async ({ page }) => {
+    await page.emulateMedia({ colorScheme: esquema });
+    await entrar(page, ANA);
+    await page.goto("/ajustes");
+    const vista = page.getByTestId("vista-estilo");
+    await expect(vista).toContainText("¿Lo apunto?");
+    await page.getByRole("textbox", { name: "Cómo se presenta" }).fill("Billetes");
+    await page.getByRole("radio", { name: /Gracioso/ }).click();
+    await expect(vista).toContainText("Aquí Billetes");
+    await expect(vista).toContainText("libreta");
+    await page.getByRole("switch", { name: /Usar emojis/ }).click();
+    await expect(vista).not.toContainText("⭐");
+    await page.getByRole("combobox", { name: "Respuestas a consultas en el grupo" }).selectOption("10");
+    await accesible(page, `ajustes ${esquema}`);
+    await page.getByRole("button", { name: "Guardar" }).click();
+    await expect(page.getByRole("status").getByText("Ajustes guardados")).toBeVisible();
+    await page.reload();
+    await expect(page.getByRole("radio", { name: /Gracioso/ })).toBeChecked();
+    await expect(page.getByRole("combobox", { name: "Respuestas a consultas en el grupo" })).toHaveValue("10");
+    // Lo deja como estaba
+    await page.getByRole("textbox", { name: "Cómo se presenta" }).fill("");
+    await page.getByRole("radio", { name: /Cercano/ }).click();
+    await page.getByRole("switch", { name: /Usar emojis/ }).click();
+    await page.getByRole("combobox", { name: "Respuestas a consultas en el grupo" }).selectOption("0");
+    await page.getByRole("button", { name: "Guardar" }).click();
+    await expect(page.getByRole("status").getByText("Ajustes guardados")).toBeVisible();
+  });
+}
+
 test("descarga el Excel", async ({ page }) => {
   await page.setViewportSize({ width: 1280, height: 860 });
   await entrar(page);

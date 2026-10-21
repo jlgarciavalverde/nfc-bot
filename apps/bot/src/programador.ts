@@ -1,7 +1,7 @@
 import type { Api } from "grammy";
 import { and, asc, eq, isNotNull, isNull, lte } from "drizzle-orm";
 import {
-  avisar, avisosPorEnviar, efimerosVencidos, programarBorrado, describirOferta, euros, fechaCorta, html, leerAjustes, listarSocios, lunes, marcarAviso, pct, plural,
+  aplicarEstilo, avisar, avisosPorEnviar, efimerosVencidos, programarBorrado, describirOferta, euros, fechaCorta, html, leerAjustes, listarSocios, lunes, marcarAviso, pct, plural,
   purgarCaducados, reclamarEnvio, recordatoriosPendientes, relojMadrid, resumenPeriodo, sumarDias, tablas, ultimoAviso, type DB,
 } from "@nfc/core";
 
@@ -20,9 +20,8 @@ export async function tick(db: DB, api: Pick<Api, "sendMessage"> & Partial<Pick<
   const { fecha, hora, diaSemana } = relojMadrid(now);
   const enviados: string[] = [];
   if (hora < HORA_AVISOS || hora >= 12) return enviados;
-  const { grupoChatId } = await leerAjustes(db);
-
-  const { avisosSilenciados } = await leerAjustes(db);
+  const aj = await leerAjustes(db);
+  const { grupoChatId, avisosSilenciados } = aj;
   const rs = await recordatoriosPendientes(db, fecha);
   const atrasadas = avisosSilenciados.includes("cobro")
     ? []
@@ -57,7 +56,7 @@ export async function tick(db: DB, api: Pick<Api, "sendMessage"> & Partial<Pick<
       );
     }
     const reply_markup = { inline_keyboard: lista.slice(0, 8).map((r) => [{ text: `✅ Hecho: ${r.comercio}`.slice(0, 60), callback_data: `hecho:${r.id}` }]) };
-    const texto = partes.join("\n");
+    const texto = aplicarEstilo(partes.join("\n"), aj);
     try {
       const m = await api.sendMessage(socio.telegramId, texto, { parse_mode: "HTML", reply_markup });
       // El de mañana sustituye a este (no se van acumulando «Hoy te toca» de días pasados)
@@ -93,7 +92,7 @@ export async function tick(db: DB, api: Pick<Api, "sendMessage"> & Partial<Pick<
   if (diaSemana === 1 && grupoChatId && (await reclamarEnvio(db, `semana:${fecha}`))) {
     const desde = sumarDias(lunes(fecha), -7);
     const hasta = sumarDias(desde, 6);
-    await api.sendMessage(grupoChatId, await textoResumenSemanal(db, desde, hasta, fecha), { parse_mode: "HTML" });
+    await api.sendMessage(grupoChatId, aplicarEstilo(await textoResumenSemanal(db, desde, hasta, fecha), aj), { parse_mode: "HTML" });
     enviados.push("semana");
   }
   if (await reclamarEnvio(db, `purga:${fecha}`)) await purgarCaducados(db);
@@ -133,10 +132,12 @@ export async function textoResumenSemanal(db: DB, desde: string, hasta: string, 
 export async function enviarAvisos(db: DB, api: Pick<Api, "sendMessage">) {
   const pendientes = await avisosPorEnviar(db);
   if (!pendientes.length) return 0;
-  const { grupoChatId } = await leerAjustes(db);
+  const aj = await leerAjustes(db);
+  const { grupoChatId } = aj;
   const socios = await listarSocios(db);
   let enviados = 0;
-  for (const a of pendientes) {
+  for (const aviso of pendientes) {
+    const a = { ...aviso, texto: aplicarEstilo(aviso.texto, aj) };
     const opts = { parse_mode: "HTML" as const, link_preview_options: { is_disabled: true } };
     let ok = false;
     try {

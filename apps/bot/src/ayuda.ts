@@ -74,8 +74,12 @@ const TEMAS: Record<string, { titulo: string; lineas: string[]; admin?: boolean 
       "/oferta 3x2 · /oferta pack 5 99€ · /oferta -10% desde 20 · «hasta 31/12» · /oferta quitar 3",
       "/config reparto igual|porcentaje|aportado · /config comision 10% · /config porcentaje Ana 50%",
       "/config stock 5 · /config admin Ana · /config socio Ana · /config baja Ana",
-      "/config bienvenida ¡Hola, {nombre}! … — texto al entrar alguien al grupo (vacío = el de por defecto)",
+      "/config bienvenida ¡Hola, {nombre}! … — texto al entrar alguien al grupo ({bot} = mi nombre; vacío = el de por defecto)",
       "/config avisos — qué avisos automáticos se publican · /config avisos panel no",
+      "/config nombre Billetes — cómo me presento · /config tono cercano|serio|gracioso · /config emojis si|no",
+      "/config ia responde en una línea — notas para la IA (cómo contestar; vacío = quitar)",
+      "/config limpieza — qué se borra solo del grupo y cuándo · /config limpieza consultas 10 · /config limpieza privado si",
+      "/limpiar — en el grupo, borra ya los mensajes míos pendientes de borrarse",
       "/vincular — en el grupo, para que el bot trabaje ahí",
     ],
   },
@@ -113,7 +117,7 @@ export function chuleta(bot: string) {
 export const BIENVENIDA_DEFECTO =
   "👋 ¡Bienvenido/a, {nombre}! Aquí llevamos todo el negocio de los paneles NFC: comercios visitados, ventas, caja y reparto. Yo lo apunto todo.";
 
-/** Bienvenida al entrar en el grupo (HTML ya escapado); `{nombre}` se sustituye por el nombre de la persona. */
-export function bienvenida(plantilla: string | null, nombre: string) {
-  return html(plantilla || BIENVENIDA_DEFECTO).replaceAll("{nombre}", `<b>${html(nombre)}</b>`);
+/** Bienvenida al entrar en el grupo (HTML ya escapado); `{nombre}` = la persona, `{bot}` = el nombre del asistente. */
+export function bienvenida(plantilla: string | null, nombre: string, bot?: string | null) {
+  return html(plantilla || BIENVENIDA_DEFECTO).replaceAll("{nombre}", `<b>${html(nombre)}</b>`).replaceAll("{bot}", html(bot || "el asistente"));
 }

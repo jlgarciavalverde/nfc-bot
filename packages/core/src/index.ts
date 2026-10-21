@@ -19,3 +19,4 @@ export * from "./servicios/panel";
 export * from "./servicios/avisos";
 export * from "./servicios/placas";
 export * from "./servicios/efimeros";
+export * from "./estilo";

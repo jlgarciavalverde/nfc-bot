@@ -145,6 +145,12 @@ describe("placas y lotes", () => {
     expect((await app.inject({ method: "PUT", url: "/api/ajustes", headers: { cookie: cAna, origin: ORIGEN }, payload: { comisionBp: 9999999 } })).statusCode).toBe(400);
     const r = await app.inject({ method: "PUT", url: "/api/ajustes", headers: { cookie: cAna, origin: ORIGEN }, payload: { stockMin: 3, avisosSilenciados: ["panel"], bienvenida: "" } });
     expect(r.json().ajustes).toMatchObject({ stockMin: 3, avisosSilenciados: ["panel"], bienvenida: null });
+    const lim = { consultasMin: 10, apuntesMin: 0, erroresMin: 5, borrarComandos: true, consultasPorPrivado: false };
+    const p = await app.inject({ method: "PUT", url: "/api/ajustes", headers: { cookie: cAna, origin: ORIGEN }, payload: { tono: "serio", emojis: false, nombreAsistente: " Billetes ", instruccionesIa: "", limpieza: lim } });
+    expect(p.json().ajustes).toMatchObject({ tono: "serio", emojis: false, nombreAsistente: "Billetes", instruccionesIa: null, limpieza: lim });
+    for (const malo of [{ tono: "pirata" }, { nombreAsistente: "x".repeat(41) }, { instruccionesIa: "x".repeat(501) }, { limpieza: { ...lim, consultasMin: 5000 } }]) {
+      expect((await app.inject({ method: "PUT", url: "/api/ajustes", headers: { cookie: cAna, origin: ORIGEN }, payload: malo })).statusCode).toBe(400);
+    }
   });
   it("socios: baja cierra sus sesiones", async () => {
     const cBea = await cookieDe(bea);

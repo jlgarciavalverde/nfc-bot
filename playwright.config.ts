@@ -8,7 +8,7 @@ export default defineConfig({
   fullyParallel: false,
   use: { baseURL: "http://localhost:4320", acceptDownloads: true },
   webServer: {
-    command: `DATABASE_URL=${DB} pnpm tsx tools/sembrar.ts && DATABASE_URL=${DB} PUBLIC_URL=http://localhost:4320 PORT=4320 WEB_DIR=apps/web/dist LOG_LEVEL=warn pnpm tsx apps/api/src/server.ts`,
+    command: `DATABASE_URL=${DB} pnpm tsx tools/sembrar.ts && DATABASE_URL=${DB} PUBLIC_URL=http://localhost:4320 PORT=4320 WEB_DIR=apps/web/dist LOG_LEVEL=warn LOGIN_RATE_LIMIT=100 pnpm tsx apps/api/src/server.ts`,
     url: "http://localhost:4320/health",
     reuseExistingServer: false,
     timeout: 60_000,

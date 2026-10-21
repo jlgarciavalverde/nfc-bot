@@ -5,7 +5,7 @@ import qrcode from "qrcode-generator";
 import { and, desc, eq, gte, lt, sql } from "drizzle-orm";
 import {
   asignarPlaca, avisar, cambiarDatoComercio, cambiarSocio, codigosDeTanda, comercioPorId, crearTanda, guardarAjuste, html, infoPlaca, leerAjustes,
-  listarSocios, listarTandas, marcarNfc, normalizarCodigo, placasPanel, quitarPlaca, registrarOperacion, tablas, TIPOS_AVISO, MAX_TANDA, type DB, type Socio,
+  listarSocios, listarTandas, marcarNfc, normalizarCodigo, placasPanel, quitarPlaca, registrarOperacion, tablas, TIPOS_AVISO, MAX_TANDA, MAX_MIN_LIMPIEZA, type DB, type Socio,
 } from "@nfc/core";
 import { HttpError, regla } from "./acceso";
 import { avisoPanel } from "./gestion";
@@ -88,6 +88,8 @@ export async function registrarAdmin(app: FastifyInstance, db: DB, publicUrl: st
   });
 
   // ── Ajustes ──
+  /** Textos que, vacíos, vuelven a lo de por defecto. */
+  const TEXTOS_OPCIONALES = new Set(["bienvenida", "nombreAsistente", "instruccionesIa"]);
   app.get("/api/ajustes", regla("socio"), async () => ({ ajustes: { ...(await leerAjustes(db)), grupoChatId: undefined }, tiposAviso: TIPOS_AVISO }));
 
   app.put("/api/ajustes", regla("admin"), async (req) => {
@@ -99,13 +101,24 @@ export async function registrarAdmin(app: FastifyInstance, db: DB, publicUrl: st
         stockMin: z.number().int().min(0).max(10_000),
         bienvenida: z.string().max(1000).nullable(),
         avisosSilenciados: z.array(z.enum(Object.keys(TIPOS_AVISO) as [string, ...string[]])).max(20),
+        nombreAsistente: z.string().trim().max(40).nullable(),
+        tono: z.enum(["cercano", "serio", "gracioso"]),
+        emojis: z.boolean(),
+        instruccionesIa: z.string().trim().max(500).nullable(),
+        limpieza: z.object({
+          consultasMin: z.number().int().min(0).max(MAX_MIN_LIMPIEZA),
+          apuntesMin: z.number().int().min(0).max(MAX_MIN_LIMPIEZA),
+          erroresMin: z.number().int().min(0).max(MAX_MIN_LIMPIEZA),
+          borrarComandos: z.boolean(),
+          consultasPorPrivado: z.boolean(),
+        }),
       })
       .partial()
       .parse(req.body);
     const cambios: string[] = [];
     for (const [k, v] of Object.entries(b) as [keyof typeof b, never][]) {
       if (v === undefined) continue;
-      await guardarAjuste(db, k, (k === "bienvenida" && !v ? null : v) as never);
+      await guardarAjuste(db, k, (TEXTOS_OPCIONALES.has(k) && !v ? null : v) as never);
       cambios.push(k);
     }
     if (cambios.length) {

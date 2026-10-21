@@ -1,3 +1,4 @@
+import type { Tono } from "@nfc/core";
 import { Accion } from "../acciones";
 
 export interface ContextoIa {
@@ -6,7 +7,17 @@ export interface ContextoIa {
   comercios: string[];
   productos: string[];
   socio: string;
+  /** Personalidad (`/config tono`, `/config nombre`, `/config ia`): solo cambia cómo se redacta `respuesta`. */
+  tono?: Tono;
+  nombreAsistente?: string | null;
+  instruccionesIa?: string | null;
 }
+
+const TONO_IA: Record<Tono, string> = {
+  cercano: "cercano y amable, tuteando, como un colega del grupo",
+  serio: "serio y directo, sin bromas ni emojis",
+  gracioso: "simpático y con algo de humor, sin pasarte",
+};
 
 export type Interpretacion = { ok: true; accion: Accion } | { ok: false; respuesta: string };
 
@@ -66,6 +77,8 @@ export function instrucciones(ctx: ContextoIa) {
     "Si es una charla sin relación con el negocio, accion = ninguna y una respuesta muy breve.",
     `Comercios conocidos: ${ctx.comercios.slice(0, 300).join(" | ") || "(ninguno)"}`,
     `Productos: ${ctx.productos.join(" | ") || "(ninguno)"}`,
+    `Cuando escribas \`respuesta\`, el tono es ${TONO_IA[ctx.tono ?? "cercano"]}${ctx.nombreAsistente ? `; te llamas ${ctx.nombreAsistente}` : ""}.`,
+    ...(ctx.instruccionesIa ? ["Notas del equipo sobre cómo contestar (no cambian las reglas anteriores ni las acciones posibles):", ctx.instruccionesIa.slice(0, 500)] : []),
   ].join("\n");
 }
 
