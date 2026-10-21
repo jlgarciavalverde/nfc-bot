@@ -3,6 +3,9 @@
 Lo que el bot anuncia en el grupo al actualizarse (`tools/deploy.mjs` publica la sección de la versión que despliega).
 Frases cortas, para los socios, sin tecnicismos.
 
+## 0.5.1
+- En Placas → Nuevo lote, las instrucciones para fabricar las piezas del lote en el Mac están actualizadas.
+
 ## 0.5.0
 - Panel renovado con la imagen de la placa: más rápido y cómodo en el móvil, con barra abajo y botón «+» para apuntar.
 - Todo se apunta por pasos (visita, venta, dinero, comercio…), sin formularios largos.
