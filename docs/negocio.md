@@ -16,7 +16,7 @@ escaneos. Diseño y piezas: `hardware/soporte-nfc/`.
 Oferta de lanzamiento: **pack de 2 por 35 €**, hasta el 31-12-2026. Las ofertas no se suman: a cada venta se le aplica lo
 más barato para el cliente (por eso, hasta fin de año, 3 paneles salen a 53 € y 4 a 70 €).
 Referencia de mercado (octubre 2026): placas sencillas online 10–25 €, mayorista recomienda ~30 €, marcas ~50 €.
-Coste estimado por soporte: 2–4 € (PLA + pegatina NFC).
+Coste estimado por soporte: 2–4 € (PLA + pegatina NFC). Pegatina recomendada: MCalle NTAG215 Ø 30 mm, Amazon.es B087YHN149 (~0,60 €/ud el 21-10-2026).
 
 ## Reparto
 A partes iguales, sin comisión para quien vende. Se cambia en el panel (Ajustes) o con `/config reparto`.

@@ -51,7 +51,7 @@ ol li { margin-bottom: 1.5mm; }
       <td>Apoyada en la cara plana. 4 paredes y 25 % de relleno (para que pese). Debajo lleva 4 huecos de Ø10 para pies de goma.</td></tr>
     <tr><td><b>Tapa</b><br>1 por soporte</td><td>tapa_M4PSN.stl<br><small>(una distinta por código)</small></td><td>Ø 30,7 × 2,2</td><td><span class="chip" style="background:#efebe3"></span>Como la placa</td>
       <td>En plano. El código va grabado (0,6 mm) en la cara de la cama, en espejo, para leerse bien con la tapa puesta.</td></tr>
-    <tr><td><b>Pegatina NFC</b><br>1 por soporte</td><td>(se compra)</td><td>Ø 25–30</td><td>—</td><td>NTAG213 o NTAG215. Se graba desde el panel con el móvil.</td></tr>
+    <tr><td><b>Pegatina NFC</b><br>1 por soporte</td><td>(se compra)</td><td>Ø 30 (máx. 31)</td><td>—</td><td>Recomendada: MCalle NTAG215 redonda de 30 mm (ver la última página). Se graba desde el panel con el móvil.</td></tr>
   </table>
   <div class="aviso"><b>Muy importante:</b> cada placa va con <b>su</b> tapa (mismo código en el nombre del archivo). No mezclar tapas entre placas. La base vale para cualquiera.</div>
   <div class="tres" style="margin-top:4mm">
@@ -82,6 +82,27 @@ ol li { margin-bottom: 1.5mm; }
     <tr><td>Pies de goma</td><td>4 huecos de Ø 10,4 × 1 mm</td><td>Para pies adhesivos de Ø 10 mm</td></tr>
   </table>
   <div class="aviso">Lo único que conviene comprobar con una impresión de prueba es el <b>ajuste a presión de la tapa</b> (cada impresora sale un poco más gruesa o más fina). Si no entra o baila, se cambia <code>holgura_tapa</code> y se vuelve a imprimir solo la tapa.</div>
+</section>
+
+<section class="pagina">
+  <h1>Etiqueta NFC recomendada</h1>
+  <div class="dos" style="grid-template-columns: 1.15fr 1fr; align-items: start">
+    <div>
+      <p style="font-size: 13pt; margin: 0 0 2mm"><b>MCalle NTAG215, pegatina redonda de 30 mm, blanca</b></p>
+      <p style="margin: 0 0 3mm">Amazon.es, referencia <b>B087YHN149</b><br><a href="https://www.amazon.es/dp/B087YHN149">amazon.es/dp/B087YHN149</a></p>
+      <p style="margin:0">Unos <b>17,89 € el pack</b> (anunciado de 30 unidades, unos 0,60 € cada una) al consultarlo el 21-10-2026.
+      La ficha de Amazon también pone «45 artículos»: <b>comprobad el número de unidades antes de comprar</b>.</p>
+    </div>
+    <table>
+      <tr><th>Por qué esta</th><th></th></tr>
+      <tr><td>Cabe</td><td>Ø 30 mm en un hueco de Ø 31 mm, la más grande que entra</td></tr>
+      <tr><td>Lee mejor</td><td>A más diámetro, más antena: se lee bien a través de 1 mm de PLA</td></tr>
+      <tr><td>Grosor</td><td>Las pegatinas finas (papel o PET) caben en el espacio de 0,8 mm detrás de la tapa</td></tr>
+      <tr><td>Chip</td><td>NTAG215 (NXP): lo leen todos los móviles con NFC, iPhone incluido, y admite <b>bloqueo permanente</b> desde el panel</td></tr>
+      <tr><td>Memoria</td><td>504 bytes; nuestra dirección ocupa unos 40</td></tr>
+    </table>
+  </div>
+  <div class="aviso"><b>No hace falta</b> la versión «antimetal» (más gruesa y cara): la placa es de plástico. Las de <b>Ø 25 mm</b> también caben, pero se leen a algo menos de distancia. NTAG213 también vale (144 bytes, de sobra), pero en Amazon.es apenas hay redondas de 30 mm.</div>
 </section>
 
 <section>
