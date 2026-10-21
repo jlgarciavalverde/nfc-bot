@@ -6,7 +6,7 @@ include <qr_ejemplo.scad>
 
 parte = "nada";     // que el modelo no dibuje su vista «todo»
 codigo = "M4PSN";
-vista = "conjunto"; // [conjunto, trasera, despiece, placa, placa_trasera, base, base_abajo, tapa]
+vista = "conjunto"; // [conjunto, trasera, despiece, despiece_trasera, placa, placa_trasera, base, base_abajo, tapa]
 
 C_BASE = "#26262a";
 C_PLACA = "#efebe3";
@@ -26,19 +26,27 @@ module tapa_vista() { color(C_PLACA) tapa(); codigo_relleno(); }
 module tapa_en_hueco() { translate([0, centro_nfc, 0]) tapa_vista(); }
 module pegatina() { color(C_PEGATINA) translate([0, centro_nfc, grosor_tapa + 0.05]) cylinder(d = diam_etiqueta, h = 0.6); }
 
-if (vista == "conjunto" || vista == "trasera") {
+// OpenSCAD ilumina desde la cámara: para las vistas traseras o de abajo se gira la pieza (no la cámara),
+// así cada cara sale con su color real en vez de en sombra.
+module montado() {
     color(C_BASE) base();
     en_ranura() { placa_color(); tapa_en_hueco(); }
 }
-if (vista == "despiece") {
+module despiezado() {
     color(C_BASE) base();
     // la placa sale hacia arriba por la ranura; la pegatina y la tapa, hacia atrás
     en_ranura() translate([0, 55, 0]) {
         placa_color();
-        translate([0, 0, -30]) pegatina();
-        translate([0, 0, -62]) tapa_en_hueco();
+        translate([-75, 0, -20]) pegatina();
+        translate([-115, 0, -20]) tapa_en_hueco();
     }
 }
-if (vista == "placa" || vista == "placa_trasera") placa_color();
-if (vista == "base" || vista == "base_abajo") color(C_BASE) base();
-if (vista == "tapa") tapa_vista();
+if (vista == "conjunto") montado();
+if (vista == "trasera") rotate([-45, 0, 0]) rotate([0, 0, 180]) montado();
+if (vista == "despiece") despiezado();
+if (vista == "despiece_trasera") rotate([-45, 0, 0]) rotate([0, 0, 180]) despiezado();
+if (vista == "placa") placa_color();
+if (vista == "placa_trasera") rotate([0, 180, 0]) placa_color();
+if (vista == "base") color(C_BASE) base();
+if (vista == "base_abajo") rotate([0, 180, 0]) color(C_BASE) base();
+if (vista == "tapa") rotate([0, 180, 0]) tapa_vista();
