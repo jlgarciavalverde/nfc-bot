@@ -357,7 +357,7 @@ export async function ejecutar(ctx: Contexto, entrada: Accion): Promise<Respuest
       return { texto: l.join("\n") };
     }
     case "cobrado": {
-      const r = await marcarCobrada(db, a.ventaId, a.metodo ?? null, socio.id, ctx.origen);
+      const r = await marcarCobrada(db, a.ventaId, a.metodo ?? null, socio.id, ctx.origen, socio.rol === "admin");
       return { texto: `✅ Venta #${r.venta.id} a ${b(r.comercio)} cobrada: ${euros(r.venta.totalCent)}${a.metodo ? ` por ${a.metodo}` : ""}.` };
     }
     case "movimiento": {

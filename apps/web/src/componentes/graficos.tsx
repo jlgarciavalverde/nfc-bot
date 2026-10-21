@@ -1,7 +1,7 @@
 import { useLayoutEffect, useRef, useState } from "react";
 import { euros, fecha, mesLargo } from "../lib/formato";
 import { ESTADOS, ORDEN_ESTADOS, type Estado } from "../lib/tipos";
-import { PuntoEstado } from "./ui";
+import { PuntoEstado } from "../ui/Superficies";
 
 /** Ancho real del contenedor: los gráficos se dibujan en píxeles para que el texto no escale con la pantalla. */
 function useAncho<T extends HTMLElement>() {
@@ -45,7 +45,7 @@ export function BarrasSemanas({ datos }: { datos: { semana: string; ventasCent: 
       <svg viewBox={`0 0 ${W} ${H}`} width="100%" height={H} preserveAspectRatio="none" className="block" role="img" aria-label="Ventas por semana" onMouseLeave={() => setActiva(null)}>
         {[0, 0.5, 1].map((f) => (
           <g key={f}>
-            <line x1={0} x2={W} y1={base - f * (base - arriba)} y2={base - f * (base - arriba)} className="stroke-regla" strokeWidth={1} />
+            <line x1={0} x2={W} y1={base - f * (base - arriba)} y2={base - f * (base - arriba)} className="stroke-borde" strokeWidth={1} />
             {f > 0 && (
               <text x={W} y={base - f * (base - arriba) - 4} textAnchor="end" className="num fill-tinta-3 text-[11px]">
                 {euros(max * f).replace(",00", "")}
@@ -60,7 +60,7 @@ export function BarrasSemanas({ datos }: { datos: { semana: string; ventasCent: 
           return (
             <g key={d.semana} onMouseEnter={() => setActiva(i)} onFocus={() => setActiva(i)} tabIndex={-1}>
               <rect x={x} y={0} width={ancho} height={H} fill="transparent" />
-              <rect x={x + ancho * 0.2} y={base - h} width={ancho * 0.6} height={Math.max(h, d.ventasCent ? 2 : 0)} rx={2} className={resaltada ? "fill-estrella" : "fill-tinta-2"} />
+              <rect x={x + ancho * 0.2} y={base - h} width={ancho * 0.6} height={Math.max(h, d.ventasCent ? 2 : 0)} rx={2} className={resaltada ? "fill-estrella" : "fill-base dark:fill-tinta-3"} />
               {d.visitas > 0 && (
                 <text x={x + ancho / 2} y={base + 15} textAnchor="middle" className="num fill-tinta-3 text-[11px]">
                   {d.visitas}
@@ -97,15 +97,15 @@ export function BarraEmbudo({ total }: { total: Record<Estado, number> }) {
   const color: Record<Estado, string> = { pendiente: "bg-e-pendiente", interesado: "bg-e-interesado", si: "bg-e-si", no: "bg-e-no", cliente: "bg-e-cliente" };
   return (
     <div>
-      <div className="flex h-3 w-full gap-px overflow-hidden rounded-sm bg-regla" aria-hidden>
+      <div className="flex h-3 w-full gap-px overflow-hidden rounded-sm bg-hundido" aria-hidden>
         {suma > 0 && ORDEN_ESTADOS.map((k) => total[k] > 0 && <div key={k} className={color[k]} style={{ width: `${(total[k] / suma) * 100}%` }} />)}
       </div>
-      <ul className="mt-3 grid grid-cols-2 gap-x-4 gap-y-1.5 text-sm sm:grid-cols-5">
+      <ul className="mt-3 grid grid-cols-2 gap-x-4 gap-y-1.5 text-sm">
         {ORDEN_ESTADOS.map((k) => (
           <li key={k} className="flex items-center gap-2">
             <PuntoEstado estado={k} />
             <span className="text-tinta-2">{ESTADOS[k]}</span>
-            <span className="num ml-auto font-semibold sm:ml-0">{total[k]}</span>
+            <span className="num ml-auto font-semibold">{total[k]}</span>
           </li>
         ))}
       </ul>
@@ -126,7 +126,7 @@ export function LineaCaja({ datos }: { datos: { mes: string; cajaCent: number; i
   return (
     <figure className="w-full min-w-0" ref={ref}>
       <svg viewBox={`0 0 ${W} ${H}`} width="100%" height={H} preserveAspectRatio="none" className="block" role="img" aria-label="Caja a final de cada mes">
-        <line x1={0} x2={W} y1={y(0)} y2={y(0)} className="stroke-regla-2" strokeDasharray="3 3" />
+        <line x1={0} x2={W} y1={y(0)} y2={y(0)} className="stroke-borde-fuerte" strokeDasharray="3 3" />
         <path d={ruta} fill="none" className="stroke-tinta" strokeWidth={2} />
         {datos.map((d, i) => (
           <g key={d.mes}>

@@ -1,6 +1,7 @@
-import { and, asc, desc, eq, isNull, sql } from "drizzle-orm";
-import type { Tx } from "../db/client";
-import { comercios, placas } from "../db/schema";
+import { randomBytes } from "node:crypto";
+import { and, asc, desc, eq, inArray, isNull, sql } from "drizzle-orm";
+import type { DB, Tx } from "../db/client";
+import { comercios, placas, socios, tandasPlacas } from "../db/schema";
 import { comercioPorId } from "./comercios";
 import { ErrorNegocio } from "./errores";
 import { registrarOperacion } from "./operaciones";
@@ -112,4 +113,99 @@ export async function escanearPlaca(db: Tx, codigoTexto: string): Promise<{ url:
   await db.update(placas).set({ escaneos: sql`${placas.escaneos} + 1`, ultimoEscaneoAt: new Date() }).where(eq(placas.id, p.id));
   if (!p.url) return { motivo: "sin_enlace", comercio: p.comercio };
   return { url: p.url };
+}
+
+// ── Lotes (tandas) de placas: reservar códigos desde el panel ──
+
+/** Código nuevo al azar (4 caracteres + control). Sin garantía de unicidad: la da la restricción `unique` al insertar. */
+export function codigoAlAzar() {
+  const bytes = randomBytes(4);
+  const base = Array.from(bytes, (b) => ALFABETO_PLACA[b % ALFABETO_PLACA.length]).join("");
+  return base + caracterControl(base);
+}
+
+export const MAX_TANDA = 200;
+
+/** Reserva `n` códigos nuevos en un lote. Ninguno se repite nunca (ni con los del bot ni con lotes anteriores). */
+export async function crearTanda(db: DB, n: number, socioId: number, nota?: string | null) {
+  if (!Number.isInteger(n) || n < 1 || n > MAX_TANDA) throw new ErrorNegocio(`Un lote es de 1 a ${MAX_TANDA} placas.`);
+  return db.transaction(async (tx) => {
+    const [t] = await tx.insert(tandasPlacas).values({ n, nota: nota?.trim() || null, creadoPor: socioId }).returning();
+    const codigos = new Set<string>();
+    let intentos = 0;
+    while (codigos.size < n) {
+      if (++intentos > n * 20) throw new Error("No consigo generar códigos libres");
+      const faltan = Array.from({ length: n - codigos.size }, codigoAlAzar).filter((c) => !codigos.has(c));
+      const r = await tx.insert(placas).values(faltan.map((codigo) => ({ codigo, tandaId: t!.id }))).onConflictDoNothing().returning({ codigo: placas.codigo });
+      for (const x of r) codigos.add(x.codigo);
+    }
+    await registrarOperacion(tx, { socioId, tipo: "lote_placas", resumen: `Lote ${t!.id} de ${n} placas` });
+    return { tanda: t!, codigos: [...codigos].sort() };
+  });
+}
+
+/** Da de alta códigos ya impresos fuera del panel (p. ej. los de `hardware/soporte-nfc/lotes/codigos.txt`). */
+export async function importarCodigos(db: DB, textos: string[], socioId: number, nota = "Importados") {
+  const validos = [...new Set(textos.map((t) => normalizarCodigo(t)).filter((c): c is string => !!c))];
+  if (!validos.length) throw new ErrorNegocio("No hay ningún código válido.");
+  return db.transaction(async (tx) => {
+    const [t] = await tx.insert(tandasPlacas).values({ n: validos.length, nota, creadoPor: socioId }).returning();
+    await tx.insert(placas).values(validos.map((codigo) => ({ codigo, tandaId: t!.id }))).onConflictDoNothing();
+    await tx.update(placas).set({ tandaId: t!.id }).where(and(inArray(placas.codigo, validos), isNull(placas.tandaId)));
+    return { tanda: t!, codigos: validos };
+  });
+}
+
+export async function listarTandas(db: Tx) {
+  return db
+    .select({
+      id: tandasPlacas.id,
+      n: tandasPlacas.n,
+      nota: tandasPlacas.nota,
+      creadoAt: tandasPlacas.creadoAt,
+      creadoPor: socios.nombre,
+      asignadas: sql<number>`(select count(*) from ${placas} p where p.tanda_id = "tandas_placas"."id" and p.comercio_id is not null)::int`,
+    })
+    .from(tandasPlacas)
+    .leftJoin(socios, eq(socios.id, tandasPlacas.creadoPor))
+    .orderBy(desc(tandasPlacas.id));
+}
+
+export async function codigosDeTanda(db: Tx, tandaId: number) {
+  const r = await db.select({ codigo: placas.codigo }).from(placas).where(eq(placas.tandaId, tandaId)).orderBy(asc(placas.codigo));
+  if (!r.length) throw new ErrorNegocio("Ese lote no existe.");
+  return r.map((x) => x.codigo);
+}
+
+/** Todas las placas (también las reservadas sin asignar) para el panel. */
+export async function placasPanel(db: Tx) {
+  return db
+    .select({
+      codigo: placas.codigo,
+      tandaId: placas.tandaId,
+      comercioId: comercios.id,
+      comercio: comercios.nombre,
+      resenasUrl: comercios.resenasUrl,
+      escaneos: placas.escaneos,
+      ultimoEscaneoAt: placas.ultimoEscaneoAt,
+      asignadaAt: placas.asignadaAt,
+      nfcGrabadaAt: placas.nfcGrabadaAt,
+      nfcBloqueadaAt: placas.nfcBloqueadaAt,
+    })
+    .from(placas)
+    .leftJoin(comercios, and(eq(comercios.id, placas.comercioId), isNull(comercios.anuladoAt)))
+    .orderBy(desc(placas.escaneos), asc(placas.codigo));
+}
+
+/** Apunta que la pegatina NFC de la placa se ha grabado (y, si `bloqueada`, bloqueado) desde el panel. */
+export async function marcarNfc(db: Tx, codigoTexto: string, bloqueada: boolean, socioId: number) {
+  const codigo = codigoOError(codigoTexto);
+  const ahora = new Date();
+  const r = await db
+    .insert(placas)
+    .values({ codigo, nfcGrabadaAt: ahora, nfcBloqueadaAt: bloqueada ? ahora : null })
+    .onConflictDoUpdate({ target: placas.codigo, set: { nfcGrabadaAt: ahora, ...(bloqueada ? { nfcBloqueadaAt: ahora } : {}) } })
+    .returning();
+  await registrarOperacion(db, { socioId, tipo: "placa_nfc", resumen: `Pegatina de la placa ${codigo} ${bloqueada ? "grabada y bloqueada" : "grabada"}`, origen: "panel" });
+  return r[0]!;
 }

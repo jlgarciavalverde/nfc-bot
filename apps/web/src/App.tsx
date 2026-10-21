@@ -1,37 +1,94 @@
-import { lazy, Suspense, useEffect, useState } from "react";
-import { useQuery, useQueryClient } from "@tanstack/react-query";
-import { Link, Route, Switch, useLocation } from "wouter";
+import { lazy, Suspense, useEffect, useState, type ReactNode } from "react";
+import { useQueryClient } from "@tanstack/react-query";
+import { Link, Redirect, Route, Switch, useLocation } from "wouter";
 import { api, ErrorApi } from "./lib/api";
+import { useYo } from "./lib/consultas";
 import type { Socio } from "./lib/tipos";
-import { Boton, Campo } from "./componentes/ui";
-import { ApuntarProvider, useApuntar } from "./componentes/Apuntar";
 import { AvisosProvider } from "./lib/acciones";
-import { Cuenta } from "./paginas/Cuenta";
-import { Inicio } from "./paginas/Inicio";
-import { Comercios } from "./paginas/Comercios";
-import { Ventas } from "./paginas/Ventas";
-import { Caja } from "./paginas/Caja";
-import { Stock } from "./paginas/Stock";
-import { Reparto } from "./paginas/Reparto";
-import { Precios } from "./paginas/Precios";
+import { ApuntarProvider } from "./apuntar/Apuntar";
+import { BuscadorProvider } from "./marco/Buscador";
+import { Marco } from "./marco/Marco";
+import { Boton } from "./ui/Boton";
+import { Campo } from "./ui/Campos";
+import { Esqueleto, EstrellaMarca, Vacio } from "./ui/Superficies";
+import { Hoy } from "./paginas/Hoy";
 
-const Mapa = lazy(() => import("./paginas/Mapa"));
+// Hoy va en el paquete inicial; el resto se carga al entrar (y se precarga al pasar por el menú)
+const Comercios = lazy(() => import("./paginas/Comercios"));
+const FichaComercio = lazy(() => import("./paginas/FichaComercio"));
+const Caja = lazy(() => import("./paginas/Caja"));
+const Ventas = lazy(() => import("./paginas/Ventas"));
+const Stock = lazy(() => import("./paginas/Stock"));
+const Placas = lazy(() => import("./paginas/Placas"));
+const Precios = lazy(() => import("./paginas/Precios"));
+const Ajustes = lazy(() => import("./paginas/Ajustes"));
+const Socios = lazy(() => import("./paginas/Socios"));
+const Auditoria = lazy(() => import("./paginas/Auditoria"));
+const Cuenta = lazy(() => import("./paginas/Cuenta"));
+const Mas = lazy(() => import("./paginas/Mas"));
+const Galeria = lazy(() => import("./paginas/Galeria"));
 
-const NAV = [
-  ["/", "Resumen"],
-  ["/comercios", "Comercios"],
-  ["/mapa", "Mapa"],
-  ["/ventas", "Ventas"],
-  ["/caja", "Caja"],
-  ["/stock", "Stock"],
-  ["/reparto", "Reparto"],
-  ["/precios", "Precios"],
-  ["/cuenta", "Cuenta"],
-] as const;
-
-export function useYo() {
+export function App() {
   const [ruta] = useLocation();
-  return useQuery({ queryKey: ["yo"], queryFn: () => api.get<{ socio: Socio }>("/api/yo").then((r) => r.socio), staleTime: 300_000, enabled: ruta !== "/entrar" });
+  const yo = useYo();
+  if (ruta === "/entrar") return <Pantalla><Entrar /></Pantalla>;
+  if (yo.isPending) return <Pantalla><Esqueleto lineas={2} /></Pantalla>;
+  if (yo.isError) return yo.error instanceof ErrorApi && yo.error.status === 401 ? <Pantalla><SinSesion /></Pantalla> : <Pantalla><p className="text-sale" role="alert">{yo.error.message}</p></Pantalla>;
+  const esAdmin = yo.data.rol === "admin";
+  const soloAdmin = (c: ReactNode) => (esAdmin ? c : <Redirect to="/" />);
+  return (
+    <AvisosProvider>
+      <ApuntarProvider>
+        <BuscadorProvider>
+          <Marco nombre={yo.data.nombre} esAdmin={esAdmin}>
+            <Suspense fallback={<Esqueleto lineas={4} alto="h-20" />}>
+              <Switch>
+                <Route path="/" component={Hoy} />
+                <Route path="/comercios" component={Comercios} />
+                <Route path="/comercios/:id">{(p) => <FichaComercio id={Number(p.id)} />}</Route>
+                <Route path="/mapa"><Redirect to="/comercios?vista=mapa" /></Route>
+                <Route path="/caja" component={Caja} />
+                <Route path="/reparto"><Redirect to="/caja?ver=reparto" /></Route>
+                <Route path="/ventas" component={Ventas} />
+                <Route path="/stock" component={Stock} />
+                <Route path="/placas" component={Placas} />
+                <Route path="/precios" component={Precios} />
+                <Route path="/cuenta" component={Cuenta} />
+                <Route path="/mas" component={Mas} />
+                <Route path="/galeria" component={Galeria} />
+                <Route path="/ajustes">{soloAdmin(<Ajustes />)}</Route>
+                <Route path="/socios">{soloAdmin(<Socios />)}</Route>
+                <Route path="/auditoria">{soloAdmin(<Auditoria />)}</Route>
+                <Route>
+                  <Vacio titulo="Esta página no existe">
+                    <Link href="/" className="font-semibold underline">Volver a Hoy</Link>
+                  </Vacio>
+                </Route>
+              </Switch>
+            </Suspense>
+          </Marco>
+        </BuscadorProvider>
+      </ApuntarProvider>
+    </AvisosProvider>
+  );
+}
+
+/** Pantallas sin sesión: la placa sobre la base negra. */
+function Pantalla({ children }: { children: ReactNode }) {
+  return (
+    <main className="flex min-h-dvh flex-col bg-base px-4 py-10 text-tinta">
+      <div className="mx-auto mt-[6vh] w-full max-w-sm">
+        <div className="mb-6 flex items-center gap-3 text-sobre-base">
+          <EstrellaMarca className="size-10" />
+          <div>
+            <div className="text-[20px] font-bold leading-tight">Socios NFC</div>
+            <div className="text-[13px] text-sobre-base-2">Panel de gestión</div>
+          </div>
+        </div>
+        <div className="tarjeta-placa bg-superficie p-6">{children}</div>
+      </div>
+    </main>
+  );
 }
 
 /** Canjea el enlace del bot (va en el fragmento #, que no llega a ningún servidor ni a los logs). */
@@ -52,14 +109,15 @@ function Entrar() {
       .catch((e: Error) => setError(e.message));
   }, [ir, qc]);
   return (
-    <main className="mx-auto max-w-md px-4 py-20">
-      <h1 className="text-xl font-semibold">Panel de socios</h1>
-      <p className="mt-3 text-tinta-2" role={error ? "alert" : "status"}>{error ?? "Entrando…"}</p>
-    </main>
+    <>
+      <h1 className="text-[22px] font-bold">{error ? "No se ha podido entrar" : "Entrando…"}</h1>
+      <p className="mt-2 text-tinta-2" role={error ? "alert" : "status"}>{error ?? "Un momento."}</p>
+      {error && <Link href="/" className="mt-4 inline-block font-semibold underline">Entrar con código</Link>}
+    </>
   );
 }
 
-/** Sin sesión: se entra con el enlace del bot o, en la app instalada (donde el enlace se abriría en el navegador), con su código. */
+/** Sin sesión: se entra con el enlace del bot o, en la app instalada, con su código de 8 cifras. */
 function SinSesion() {
   const qc = useQueryClient();
   const [codigo, setCodigo] = useState("");
@@ -79,98 +137,16 @@ function SinSesion() {
     }
   };
   return (
-    <main className="mx-auto max-w-sm px-4 py-16">
-      <h1 className="text-xl font-semibold">Panel de socios</h1>
-      <p className="mt-3 text-tinta-2">
+    <>
+      <h1 className="text-[22px] font-bold">Entrar</h1>
+      <p className="mt-2 text-[14px] text-tinta-2">
         Escribe <b className="font-mono">/panel</b> al bot de Telegram. Te manda un enlace (ábrelo y listo) y un código de 8 cifras para entrar aquí.
       </p>
-      <form onSubmit={entrar} className="mt-6 space-y-3" aria-label="Entrar con código">
-        <Campo etiqueta="Código" inputMode="numeric" autoComplete="one-time-code" placeholder="1234 5678" value={codigo} onChange={(e) => setCodigo(e.target.value)} required />
-        {error && <p role="alert" className="text-sm text-sale">{error}</p>}
-        <Boton type="submit" variante="primario" className="w-full" disabled={ocupado}>Entrar</Boton>
+      <form onSubmit={entrar} className="mt-5 space-y-3" aria-label="Entrar con código">
+        <Campo etiqueta="Código" inputMode="numeric" autoComplete="one-time-code" placeholder="1234 5678" value={codigo} onChange={(e) => setCodigo(e.target.value)} error={error} className="!font-mono !text-[22px] tracking-[0.2em]" required />
+        <Boton type="submit" variante="primario" tamano="lg" className="w-full" cargando={ocupado}>Entrar</Boton>
       </form>
-      <p className="mt-6 text-[13px] text-tinta-3">La sesión se queda abierta en este dispositivo. Para cerrarla en todos: /panel cerrar.</p>
-    </main>
-  );
-}
-
-function BotonApuntar() {
-  const abrir = useApuntar();
-  return (
-    <Boton variante="primario" onClick={() => abrir({ tipo: "venta" })}>
-      Apuntar
-    </Boton>
-  );
-}
-
-export function App() {
-  const [ruta] = useLocation();
-  const yo = useYo();
-  if (ruta === "/entrar") return <AvisosProvider><Entrar /></AvisosProvider>;
-  if (yo.isPending) return <p className="p-8 text-tinta-3" role="status">Cargando…</p>;
-  if (yo.isError) return yo.error instanceof ErrorApi && yo.error.status === 401 ? <SinSesion /> : <p className="p-8 text-sale" role="alert">{yo.error.message}</p>;
-
-  return (
-    <AvisosProvider>
-      <ApuntarProvider>
-        <Marco nombre={yo.data.nombre} ruta={ruta} />
-      </ApuntarProvider>
-    </AvisosProvider>
-  );
-}
-
-function Marco({ nombre, ruta }: { nombre: string; ruta: string }) {
-  return (
-    <div className="min-h-dvh">
-      <header className="border-b border-regla bg-papel">
-        <div className="mx-auto flex max-w-6xl flex-wrap items-center gap-x-6 gap-y-2 px-4 pt-3">
-          <div className="flex items-center gap-2 font-semibold">
-            <svg viewBox="0 0 32 32" className="size-6" aria-hidden><rect width="32" height="32" rx="7" className="fill-tinta" /><path d="M16 6l2.9 6.2 6.7.7-5 4.6 1.4 6.6L16 20.8 10 24.1l1.4-6.6-5-4.6 6.7-.7z" className="fill-estrella" /></svg>
-            Panel de socios
-          </div>
-          <div className="ml-auto flex items-center gap-2 text-sm">
-            <Link href="/cuenta" className="hidden text-tinta-2 underline-offset-2 hover:underline sm:inline">{nombre}</Link>
-            <a href="/api/exportar.xlsx" className="inline-flex min-h-9 items-center rounded-md border border-regla-2 px-3 font-medium hover:bg-fondo" download>
-              Excel
-            </a>
-            <BotonApuntar />
-          </div>
-        </div>
-        <nav aria-label="Secciones" className="mx-auto max-w-6xl overflow-x-auto px-4">
-          <ul className="flex gap-1 pt-2">
-            {NAV.map(([href, texto]) => {
-              const activa = href === "/" ? ruta === "/" : ruta.startsWith(href);
-              return (
-                <li key={href}>
-                  <Link href={href} aria-current={activa ? "page" : undefined} className={`block whitespace-nowrap border-b-2 px-2.5 pb-2.5 pt-1 text-sm ${activa ? "border-estrella font-semibold text-tinta" : "border-transparent text-tinta-2 hover:text-tinta"}`}>
-                    {texto}
-                  </Link>
-                </li>
-              );
-            })}
-          </ul>
-        </nav>
-      </header>
-      <main className="mx-auto max-w-6xl px-4 py-6">
-        <Switch>
-          <Route path="/" component={Inicio} />
-          <Route path="/comercios" component={Comercios} />
-          <Route path="/mapa">
-            <Suspense fallback={<p className="text-tinta-3">Cargando mapa…</p>}>
-              <Mapa />
-            </Suspense>
-          </Route>
-          <Route path="/ventas" component={Ventas} />
-          <Route path="/caja" component={Caja} />
-          <Route path="/stock" component={Stock} />
-          <Route path="/reparto" component={Reparto} />
-          <Route path="/precios" component={Precios} />
-          <Route path="/cuenta" component={Cuenta} />
-          <Route>
-            <p>Esta página no existe. <Link href="/" className="underline">Volver al resumen</Link></p>
-          </Route>
-        </Switch>
-      </main>
-    </div>
+      <p className="mt-5 text-[13px] text-tinta-3">La sesión se queda abierta en este dispositivo. Para cerrarla en todos: /panel cerrar.</p>
+    </>
   );
 }

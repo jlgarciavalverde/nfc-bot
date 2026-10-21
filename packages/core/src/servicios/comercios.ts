@@ -83,13 +83,15 @@ export async function cambiarDatoComercio(db: Tx, comercioId: number, campo: Cam
     set.nombreNorm = normalizar(v);
   }
   const [c] = await db.update(comercios).set(set).where(and(vivos, eq(comercios.id, comercioId))).returning();
-  await registrarOperacion(db, { socioId, tipo: "comercio_dato", resumen: `${c!.nombre}: ${campo} = ${v ?? "(vacío)"}`, origen });
+  const etiqueta = { tipo: "tipo", zona: "zona", direccion: "dirección", contacto: "contacto", maps: "enlace de Maps", resenas: "enlace de reseñas", nota: "nota", nombre: "nombre" }[campo];
+  const corto = campo === "maps" || campo === "resenas" ? (v ? "puesto" : "quitado") : `«${v ?? ""}»`;
+  await registrarOperacion(db, { socioId, tipo: "comercio_dato", resumen: v ? `${c!.nombre}: ${etiqueta} ${corto}` : `${c!.nombre}: ${etiqueta} borrado`, origen });
   return c!;
 }
 
 export async function ponerUbicacion(db: Tx, comercioId: number, lat: number, lon: number, socioId: number) {
   const [c] = await db.update(comercios).set({ lat, lon, actualizadoAt: new Date() }).where(and(vivos, eq(comercios.id, comercioId))).returning();
-  await registrarOperacion(db, { socioId, tipo: "comercio_dato", resumen: `${c!.nombre}: ubicación` });
+  await registrarOperacion(db, { socioId, tipo: "comercio_dato", resumen: `${c!.nombre}: ubicación guardada` });
   return c!;
 }
 

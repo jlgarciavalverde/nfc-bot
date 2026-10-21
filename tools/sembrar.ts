@@ -2,7 +2,7 @@
 //   DATABASE_URL=postgres://nfc:nfc@127.0.0.1:5434/nfc pnpm tsx tools/sembrar.ts
 import {
   altaSocio, apuntarMovimiento, comprarLote, crearComercio, crearOferta, crearProducto, createDb, guardarAjuste, guardarTramo,
-  hoy, ponerUbicacion, registrarVenta, registrarVisita, runMigrations, sumarDias,
+  hoy, ponerUbicacion, registrarVenta, registrarVisita, runMigrations, sumarDias, crearTanda, asignarPlaca, cambiarDatoComercio, escanearPlaca, marcarNfc,
 } from "@nfc/core";
 import { vaciar } from "@nfc/core/testing";
 
@@ -74,5 +74,14 @@ for (const [i, uds, hace, cobrada, metodo] of ventas) {
   await registrarVenta(db, { comercioId: cs[i]!.id, producto: panel, uds, cobrada, metodo, fecha: d(hace) }, quien[i % 3]!.id);
 }
 await apuntarMovimiento(db, { tipo: "retirada", importeCent: 2000, socioId: bea.id, nota: "cena de socios", fecha: d(3) }, bea.id);
+
+// Placas: un lote de 8, 4 activas (3 con enlace de reseñas y escaneos)
+const { codigos } = await crearTanda(db, 8, ana.id, "Primera impresión");
+for (const [k, i] of [[0, 0], [1, 1], [2, 4], [3, 7]] as const) {
+  await asignarPlaca(db, codigos[k]!, cs[i]!.id, quien[k % 3]!.id);
+  if (k < 3) await cambiarDatoComercio(db, cs[i]!.id, "resenas", `https://g.page/r/ejemplo${k}/review`, ana.id);
+  for (let e = 0; e < [23, 9, 4, 0][k]!; e++) await escanearPlaca(db, codigos[k]!);
+}
+await marcarNfc(db, codigos[0]!, true, ana.id);
 console.log(`Sembrado: ${cs.length} comercios, ${ventas.length} ventas.`);
 await sql.end();

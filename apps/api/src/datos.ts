@@ -20,6 +20,7 @@ export async function comerciosPanel(db: Tx) {
       direccion: comercios.direccion,
       contacto: comercios.contacto,
       mapsUrl: comercios.mapsUrl,
+      resenasUrl: comercios.resenasUrl,
       nota: comercios.nota,
       lat: comercios.lat,
       lon: comercios.lon,

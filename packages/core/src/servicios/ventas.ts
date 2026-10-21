@@ -99,10 +99,15 @@ export async function ventaPorId(db: Tx, id: number) {
   return v;
 }
 
-export async function marcarCobrada(db: DB, ventaId: number, metodo: MetodoPago | null, socioId: number, origen = "bot") {
+/**
+ * Marca una venta como cobrada. Con `esAdmin` definido se aplican los permisos: solo quien la vendió o un admin
+ * (sin definir, sin comprobación: compatibilidad con llamadas internas).
+ */
+export async function marcarCobrada(db: DB, ventaId: number, metodo: MetodoPago | null, socioId: number, origen = "bot", esAdmin?: boolean) {
   return db.transaction(async (tx) => {
     const [v] = await tx.select().from(ventas).where(and(eq(ventas.id, ventaId), isNull(ventas.anuladoAt))).for("update");
     if (!v) throw new ErrorNegocio(`No hay ninguna venta #${ventaId}.`);
+    if (esAdmin === false && v.socioId !== socioId) throw new ErrorNegocio("Solo quien hizo la venta (o un admin) puede marcarla como cobrada.");
     if (v.cobrada) throw new ErrorNegocio(`La venta #${ventaId} ya estaba cobrada.`);
     const [c] = await tx.select({ nombre: comercios.nombre }).from(comercios).where(eq(comercios.id, v.comercioId));
     await tx.update(ventas).set({ cobrada: true, metodo }).where(eq(ventas.id, v.id));

@@ -6,6 +6,7 @@ import {
   marcarHecho, registrarVenta, registrarVisita, resolverProducto, tablas, CAMPOS_COMERCIO, type DB, type Socio, type Tx,
 } from "@nfc/core";
 import { eq } from "drizzle-orm";
+import { regla } from "./acceso";
 
 export const eurosTxt = euros;
 
@@ -26,26 +27,36 @@ const TIPO_MOV = { aportacion: "aportación", gasto: "gasto", ingreso: "ingreso"
 export async function registrarGestion(app: FastifyInstance, db: DB, g: { socio: (r: FastifyRequest) => Socio; admin: (r: FastifyRequest) => Socio }) {
   const { socio } = g;
 
-  app.get("/api/actividad", async (req) => ({ actividad: await actividadReciente(db, socio(req).id) }));
+  app.get("/api/actividad", regla("socio"), async (req) => ({ actividad: await actividadReciente(db, socio(req).id) }));
 
-  app.post("/api/deshacer", async (req) => {
+  app.post("/api/deshacer", regla("socio"), async (req) => {
     const s = socio(req);
     const resumen = await deshacerUltima(db, s.id);
     await avisoPanel(db, s, `deshecho «${resumen}»`);
     return { resumen };
   });
 
-  app.post("/api/comercios", async (req) => {
+  app.post("/api/comercios", regla("socio"), async (req) => {
     const s = socio(req);
     const b = z
-      .object({ nombre: z.string().trim().min(1).max(120), tipo: texto(), zona: texto(), direccion: texto(), contacto: texto(), mapsUrl: texto().refine((v) => !v || v.startsWith("https://"), "El enlace tiene que empezar por https://"), nota: texto() })
+      .object({
+        nombre: z.string().trim().min(1).max(120),
+        tipo: texto(),
+        zona: texto(),
+        direccion: texto(),
+        contacto: texto(),
+        mapsUrl: texto().refine((v) => !v || v.startsWith("https://"), "El enlace tiene que empezar por https://"),
+        nota: texto(),
+        lat: z.number().min(-90).max(90).optional(),
+        lon: z.number().min(-180).max(180).optional(),
+      })
       .parse(req.body);
     const c = await crearComercio(db, b, s.id, "panel");
     await avisoPanel(db, s, `nuevo comercio ${c.nombre}${c.zona ? ` (${c.zona})` : ""}`);
     return { comercio: c };
   });
 
-  app.patch("/api/comercios/:id", async (req) => {
+  app.patch("/api/comercios/:id", regla("socio"), async (req) => {
     const s = socio(req);
     const cid = id.parse((req.params as { id: string }).id);
     const b = z.partialRecord(z.enum(Object.keys(CAMPOS_COMERCIO) as [keyof typeof CAMPOS_COMERCIO]), z.string().max(500)).parse(req.body);
@@ -54,7 +65,7 @@ export async function registrarGestion(app: FastifyInstance, db: DB, g: { socio:
     return { comercio: c };
   });
 
-  app.post("/api/visitas", async (req) => {
+  app.post("/api/visitas", regla("socio"), async (req) => {
     const s = socio(req);
     const b = z.object({ comercioId: id, resultado: z.enum(["si", "no", "luego", "interesado"]), nota: texto(), proxima: fecha.optional().nullable() }).parse(req.body);
     const r = await registrarVisita(db, { comercioId: b.comercioId, resultado: b.resultado, nota: b.nota, proximaFecha: b.proxima ?? null }, s.id, "panel");
@@ -62,7 +73,7 @@ export async function registrarGestion(app: FastifyInstance, db: DB, g: { socio:
     return r;
   });
 
-  app.post("/api/ventas", async (req) => {
+  app.post("/api/ventas", regla("socio"), async (req) => {
     const s = socio(req);
     const b = z
       .object({ comercioId: id, productoId: id.optional(), uds: z.number().int().positive().max(10_000), cobrada: z.boolean(), metodo: metodo.optional().nullable(), pactadoCent: cent.optional().nullable(), nota: texto() })
@@ -75,16 +86,16 @@ export async function registrarGestion(app: FastifyInstance, db: DB, g: { socio:
     return { venta: r.venta };
   });
 
-  app.post("/api/ventas/:id/cobrar", async (req) => {
+  app.post("/api/ventas/:id/cobrar", regla("socio"), async (req) => {
     const s = socio(req);
     const vid = id.parse((req.params as { id: string }).id);
     const b = z.object({ metodo: metodo.optional().nullable() }).parse(req.body ?? {});
-    const r = await marcarCobrada(db, vid, b.metodo ?? null, s.id, "panel");
+    const r = await marcarCobrada(db, vid, b.metodo ?? null, s.id, "panel", s.rol === "admin");
     await avisoPanel(db, s, `cobrada la venta #${vid} de ${r.comercio} (${euros(r.venta.totalCent)}${b.metodo ? `, ${b.metodo}` : ""})`);
     return { ok: true };
   });
 
-  app.post("/api/movimientos", async (req) => {
+  app.post("/api/movimientos", regla("socio"), async (req) => {
     const s = socio(req);
     const b = z.object({ tipo: z.enum(["aportacion", "gasto", "ingreso", "retirada"]), cent, categoria: texto(60), nota: texto() }).parse(req.body);
     await apuntarMovimiento(db, { tipo: b.tipo, importeCent: b.cent, socioId: s.id, categoria: b.categoria?.toLowerCase() ?? (b.tipo === "ingreso" ? "otros" : null), nota: b.nota }, s.id, "panel");
@@ -92,7 +103,7 @@ export async function registrarGestion(app: FastifyInstance, db: DB, g: { socio:
     return { ok: true };
   });
 
-  app.post("/api/compras", async (req) => {
+  app.post("/api/compras", regla("socio"), async (req) => {
     const s = socio(req);
     const b = z.object({ productoId: id.optional(), uds: z.number().int().positive().max(100_000), cent, proveedor: texto(120) }).parse(req.body);
     const producto = b.productoId ? (await listarProductos(db)).find((p) => p.id === b.productoId) : await resolverProducto(db);
@@ -102,7 +113,7 @@ export async function registrarGestion(app: FastifyInstance, db: DB, g: { socio:
     return { lote: l };
   });
 
-  app.post("/api/recordatorios", async (req) => {
+  app.post("/api/recordatorios", regla("socio"), async (req) => {
     const s = socio(req);
     const b = z.object({ comercioId: id, fecha, nota: texto() }).parse(req.body);
     if (b.fecha < hoy()) throw new ErrorNegocio("Esa fecha ya ha pasado.");
@@ -111,14 +122,14 @@ export async function registrarGestion(app: FastifyInstance, db: DB, g: { socio:
     return { recordatorio: r };
   });
 
-  app.post("/api/recordatorios/:id/hecho", async (req) => {
+  app.post("/api/recordatorios/:id/hecho", regla("socio"), async (req) => {
     const s = socio(req);
     await marcarHecho(db, id.parse((req.params as { id: string }).id), s.id);
     return { ok: true };
   });
 
   /** Para el buscador de comercios de los formularios. */
-  app.get("/api/comercios-buscar", async (req) => {
+  app.get("/api/comercios-buscar", regla("socio"), async (req) => {
     socio(req);
     const q = z.object({ q: z.string().max(120) }).parse(req.query);
     return { comercios: (await buscarComercio(db, q.q)).opciones.map((c) => ({ id: c.id, nombre: c.nombre, zona: c.zona, estado: c.estado })) };

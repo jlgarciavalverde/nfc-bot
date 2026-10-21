@@ -123,11 +123,25 @@ export const comercios = pgTable(
  * Placas impresas. Cada una lleva un código (en el QR y en la pegatina NFC: `/r/<código>`) que redirige al enlace de
  * reseñas del comercio al que esté asignada. Se imprimen en lotes sin saber para quién son: la fila se crea al asignarla.
  */
+/** Lote de placas impresas: los códigos se reservan aquí (la BD es el registro único: nunca se repite un código). */
+export const tandasPlacas = pgTable("tandas_placas", {
+  id: integer().primaryKey().generatedAlwaysAsIdentity(),
+  n: integer().notNull(),
+  nota: text(),
+  creadoPor: integer().references(() => socios.id),
+  creadoAt: creado(),
+});
+
 export const placas = pgTable(
   "placas",
   {
     id: integer().primaryKey().generatedAlwaysAsIdentity(),
     codigo: text().notNull().unique(),
+    /** Lote en el que se reservó el código (null: placas anteriores a los lotes, creadas al asignar). */
+    tandaId: integer().references(() => tandasPlacas.id),
+    /** La pegatina NFC se grabó (y comprobó) desde el panel; `nfcBloqueadaAt` si además se bloqueó. */
+    nfcGrabadaAt: timestamp({ withTimezone: true }),
+    nfcBloqueadaAt: timestamp({ withTimezone: true }),
     comercioId: integer().references(() => comercios.id),
     asignadaPor: integer().references(() => socios.id),
     asignadaAt: timestamp({ withTimezone: true }),

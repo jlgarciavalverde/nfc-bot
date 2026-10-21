@@ -1,218 +1,203 @@
-import { useState, type FormEvent } from "react";
-import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+import { useState } from "react";
 import { calcularPrecio } from "@nfc/core/precios";
+import { Plus, Trash } from "@phosphor-icons/react";
 import { api } from "../lib/api";
 import { aCent, euros, fecha, pct } from "../lib/formato";
+import { useAccion } from "../lib/acciones";
+import { usePrecios, useYo } from "../lib/consultas";
 import type { Producto } from "../lib/tipos";
-import { useYo } from "../App";
-import { Boton, Campo, Datos, Selector, Seccion, Tabla, Titulo, Vacio } from "../componentes/ui";
+import { Boton, BotonIcono } from "../ui/Boton";
+import { Campo, Opciones } from "../ui/Campos";
+import { Hoja } from "../ui/Hoja";
+import { Datos, Esqueleto, Estrellas, Seccion, Tarjeta, TarjetaPlaca, Titulo, Vacio } from "../ui/Superficies";
 
 const hoy = () => new Date().toLocaleDateString("sv-SE", { timeZone: "Europe/Madrid" });
+type Edicion = { tipo: "tramo" | "oferta" | "precio"; p: Producto } | { tipo: "producto" } | null;
 
-export function Precios() {
-  const q = useQuery({ queryKey: ["precios"], queryFn: () => api.get<{ productos: Producto[] }>("/api/precios").then((r) => r.productos) });
+export default function Precios() {
+  const q = usePrecios();
   const esAdmin = useYo().data?.rol === "admin";
+  const [edicion, setEdicion] = useState<Edicion>(null);
   return (
-    <Datos q={q}>
-      {(ps) => (
-        <>
-          <Titulo>Precios y bonos</Titulo>
-          {!ps.length && <Vacio>Aún no hay productos.</Vacio>}
-          <div className="space-y-10">
-            {ps.map((p) => <FichaProducto key={p.id} p={p} admin={esAdmin} />)}
-          </div>
-          {esAdmin && <NuevoProducto />}
-        </>
-      )}
-    </Datos>
+    <>
+      <Titulo detalle={esAdmin ? "Las ofertas no se suman: a cada venta se le aplica lo más barato para el cliente." : "Solo un admin puede cambiar los precios."} accion={esAdmin ? <Boton icono={<Plus size={17} />} onClick={() => setEdicion({ tipo: "producto" })}>Producto</Boton> : undefined}>
+        Precios y bonos
+      </Titulo>
+      <Datos q={q} esqueleto={<Esqueleto lineas={3} alto="h-40" />}>
+        {(ps) => (ps.length ? <div className="space-y-10">{ps.map((p) => <FichaProducto key={p.id} p={p} admin={esAdmin} editar={setEdicion} />)}</div> : <Vacio titulo="Aún no hay productos" />)}
+      </Datos>
+      <Hoja abierta={!!edicion} onCerrar={() => setEdicion(null)} titulo={!edicion ? "" : edicion.tipo === "tramo" ? "Nuevo tramo" : edicion.tipo === "oferta" ? "Nueva oferta" : edicion.tipo === "precio" ? "Precio de lista" : "Nuevo producto"} descripcion={edicion && "p" in edicion ? edicion.p.nombre : undefined}>
+        {edicion?.tipo === "tramo" && <FormTramo p={edicion.p} hecho={() => setEdicion(null)} />}
+        {edicion?.tipo === "oferta" && <FormOferta p={edicion.p} hecho={() => setEdicion(null)} />}
+        {edicion?.tipo === "precio" && <FormPrecio p={edicion.p} hecho={() => setEdicion(null)} />}
+        {edicion?.tipo === "producto" && <FormProducto hecho={() => setEdicion(null)} />}
+      </Hoja>
+    </>
   );
 }
 
-function useCambio<T>(f: (x: T) => Promise<unknown>) {
-  const qc = useQueryClient();
-  return useMutation({ mutationFn: f, onSuccess: () => qc.invalidateQueries({ queryKey: ["precios"] }) });
-}
-
-function FichaProducto({ p, admin }: { p: Producto; admin: boolean }) {
-  const [uds, setUds] = useState("5");
-  const n = Number(uds);
-  const presupuesto = Number.isInteger(n) && n > 0 && n <= 10_000 ? calcularPrecio(n, p.precioCent, p.tramos, p.ofertas, hoy()) : null;
-  const ejemplos = [1, 3, 5, 10, 20].map((k) => calcularPrecio(k, p.precioCent, p.tramos, p.ofertas, hoy()));
-  const quitarTramo = useCambio((desde: number) => api.del(`/api/tramos?productoId=${p.id}&desdeUds=${desde}`));
-  const quitarOferta = useCambio((id: number) => api.del(`/api/ofertas/${id}`));
+function FichaProducto({ p, admin, editar }: { p: Producto; admin: boolean; editar: (e: Edicion) => void }) {
+  const [uds, setUds] = useState(3);
+  const presupuesto = calcularPrecio(uds, p.precioCent, p.tramos, p.ofertas, hoy());
+  const ejemplos = [1, 2, 3, 5, 10].map((k) => calcularPrecio(k, p.precioCent, p.tramos, p.ofertas, hoy()));
+  const quitarTramo = useAccion((desde: number) => api.del(`/api/tramos?productoId=${p.id}&desdeUds=${desde}`), "Tramo quitado");
+  const quitarOferta = useAccion((id: number) => api.del(`/api/ofertas/${id}`), "Oferta retirada");
   return (
-    <Seccion titulo={p.nombre} extra={<span className="num text-tinta-2">{euros(p.precioCent)} la unidad</span>}>
-      <div className="grid grid-cols-1 gap-8 pt-3 lg:grid-cols-2">
-        <div className="min-w-0 space-y-6">
-          <div>
-            <h3 className="mb-1 text-sm font-semibold">Tramos por cantidad</h3>
-            {p.tramos.length ? (
-              <ul className="num divide-y divide-regla text-sm">
-                {p.tramos.map((t) => (
-                  <li key={t.id} className="flex items-center gap-3 py-1.5">
-                    <span>Desde {t.desdeUds} uds</span>
-                    <span className="ml-auto font-medium">{t.precioCent != null ? `${euros(t.precioCent)}/ud` : `−${pct(t.descuentoBp!)}`}</span>
-                    {admin && <Boton variante="plano" aria-label={`Quitar el tramo desde ${t.desdeUds}`} onClick={() => quitarTramo.mutate(t.desdeUds)}>Quitar</Boton>}
-                  </li>
-                ))}
-              </ul>
-            ) : <p className="text-sm text-tinta-3">Sin tramos: siempre el precio de lista.</p>}
-            {admin && <NuevoTramo productoId={p.id} />}
-            {admin && <CambiarPrecio p={p} />}
-          </div>
-          <div>
-            <h3 className="mb-1 text-sm font-semibold">Ofertas</h3>
-            {p.ofertas.length ? (
-              <ul className="divide-y divide-regla text-sm">
-                {p.ofertas.map((o) => (
-                  <li key={o.id} className="flex items-center gap-3 py-1.5">
-                    <span className="font-medium">{o.descripcion}</span>
-                    <span className="text-tinta-3">{o.hasta ? `hasta el ${fecha(o.hasta, true)}` : "sin fecha de fin"}</span>
-                    {admin && <Boton variante="plano" className="ml-auto" aria-label={`Quitar la oferta ${o.descripcion}`} onClick={() => quitarOferta.mutate(o.id)}>Quitar</Boton>}
-                  </li>
-                ))}
-              </ul>
-            ) : <p className="text-sm text-tinta-3">Sin ofertas.</p>}
-            {admin && <NuevaOferta productoId={p.id} />}
-            <p className="mt-2 text-[13px] text-tinta-3">Las ofertas no se suman entre sí ni con los tramos: a cada venta se le aplica lo que salga más barato.</p>
-          </div>
+    <section aria-label={p.nombre} className="space-y-4">
+      <div className="flex flex-wrap items-end justify-between gap-3">
+        <div>
+          <h2 className="text-[20px] font-bold">{p.nombre}</h2>
+          <p className="num text-[15px] text-tinta-2"><b className="text-[22px] text-tinta">{euros(p.precioCent)}</b> la unidad</p>
         </div>
-        <div className="min-w-0">
-          <h3 className="mb-2 text-sm font-semibold">Calculadora</h3>
-          <div className="flex items-end gap-4">
-            <div className="w-28"><Campo etiqueta="Paneles" type="number" min={1} max={10000} inputMode="numeric" value={uds} onChange={(e) => setUds(e.target.value)} /></div>
-            {presupuesto && (
-              <div className="num pb-1" aria-live="polite">
-                <div className="text-2xl font-semibold">{euros(presupuesto.totalCent)}</div>
-                <div className="text-[13px] text-tinta-2">{euros(Math.round(presupuesto.totalCent / presupuesto.uds))}/ud{presupuesto.ahorroCent > 0 ? `, ahorra ${euros(presupuesto.ahorroCent)}` : ""}</div>
-              </div>
-            )}
+        {admin && <Boton tamano="sm" onClick={() => editar({ tipo: "precio", p })}>Cambiar precio</Boton>}
+      </div>
+      <div className="grid grid-cols-1 gap-5 lg:grid-cols-2">
+        <TarjetaPlaca>
+          <div className="flex items-center justify-between gap-3">
+            <span className="text-[13px] font-semibold text-tinta-3">Calculadora</span>
+            <Estrellas llenas={Math.min(5, uds)} tam={14} />
           </div>
-          {presupuesto && <p className="mt-1 text-sm text-tinta-2">{presupuesto.aplicado}</p>}
-          <Tabla etiqueta="Precios de ejemplo">
-            <thead>
-              <tr><th>Paneles</th><th className="text-right">Total</th><th className="text-right">Por ud</th><th>Se aplica</th></tr>
-            </thead>
-            <tbody className="num">
+          <div className="mt-3 flex items-center gap-3">
+            <button type="button" aria-label="Uno menos" onClick={() => setUds((u) => Math.max(1, u - 1))} className="size-11 rounded-xl border border-control text-[20px] font-bold hover:bg-hundido">−</button>
+            <span className="num w-16 text-center text-[28px] font-bold" aria-live="polite">{uds}</span>
+            <button type="button" aria-label="Uno más" onClick={() => setUds((u) => u + 1)} className="size-11 rounded-xl border border-control text-[20px] font-bold hover:bg-hundido">+</button>
+            <span className="text-tinta-3">{uds === 1 ? "panel" : "paneles"}</span>
+          </div>
+          <div className="num mt-4 text-[38px] font-bold leading-none">{euros(presupuesto.totalCent)}</div>
+          <p className="mt-1 text-[14px] text-tinta-2">{euros(Math.round(presupuesto.totalCent / uds))}/ud, {presupuesto.aplicado.toLowerCase()}{presupuesto.ahorroCent > 0 && <>, ahorra <b className="text-entra">{euros(presupuesto.ahorroCent)}</b></>}</p>
+          <table className="num mt-4 text-[14px]">
+            <tbody>
               {ejemplos.map((e) => (
-                <tr key={e.uds}><td>{e.uds}</td><td className="text-right font-medium">{euros(e.totalCent)}</td><td className="text-right">{euros(Math.round(e.totalCent / e.uds))}</td><td className="text-tinta-2">{e.aplicado}</td></tr>
+                <tr key={e.uds} className="border-t border-borde">
+                  <td className="py-1.5 text-tinta-3">{e.uds} ud{e.uds > 1 ? "s" : ""}</td>
+                  <td className="py-1.5 text-right font-semibold">{euros(e.totalCent)}</td>
+                  <td className="py-1.5 pl-3 text-right text-tinta-3">{euros(Math.round(e.totalCent / e.uds))}/ud</td>
+                </tr>
               ))}
             </tbody>
-          </Tabla>
+          </table>
+        </TarjetaPlaca>
+        <div className="space-y-5">
+          <Seccion titulo="Tramos por cantidad" extra={admin && <button type="button" className="font-semibold text-tinta-2 hover:text-tinta" onClick={() => editar({ tipo: "tramo", p })}>Añadir</button>}>
+            {p.tramos.length ? (
+              <Tarjeta className="divide-y divide-borde">
+                {p.tramos.map((t) => (
+                  <div key={t.id} className="num flex items-center gap-3 px-4 py-2.5">
+                    <span>Desde <b>{t.desdeUds}</b> uds</span>
+                    <span className="ml-auto font-bold">{t.precioCent != null ? `${euros(t.precioCent)}/ud` : `−${pct(t.descuentoBp!)}`}</span>
+                    {admin && <BotonIcono etiqueta={`Quitar el tramo desde ${t.desdeUds}`} onClick={() => quitarTramo.mutate(t.desdeUds)}><Trash size={17} /></BotonIcono>}
+                  </div>
+                ))}
+              </Tarjeta>
+            ) : (
+              <p className="text-[14px] text-tinta-3">Sin tramos: siempre el precio de lista.</p>
+            )}
+          </Seccion>
+          <Seccion titulo="Ofertas" extra={admin && <button type="button" className="font-semibold text-tinta-2 hover:text-tinta" onClick={() => editar({ tipo: "oferta", p })}>Añadir</button>}>
+            {p.ofertas.length ? (
+              <Tarjeta className="divide-y divide-borde">
+                {p.ofertas.map((o) => (
+                  <div key={o.id} className="flex items-center gap-3 px-4 py-2.5">
+                    <span className="min-w-0 flex-1"><b className="font-semibold">{o.descripcion}</b><span className="block text-[13px] text-tinta-3">{o.hasta ? `hasta el ${fecha(o.hasta, true)}` : "sin fecha de fin"}</span></span>
+                    {admin && <BotonIcono etiqueta={`Retirar la oferta ${o.descripcion}`} onClick={() => quitarOferta.mutate(o.id)}><Trash size={17} /></BotonIcono>}
+                  </div>
+                ))}
+              </Tarjeta>
+            ) : (
+              <p className="text-[14px] text-tinta-3">Sin ofertas.</p>
+            )}
+          </Seccion>
         </div>
       </div>
-    </Seccion>
+    </section>
   );
 }
 
-function Formulario({ titulo, onSubmit, children, error, ocupado }: { titulo: string; onSubmit: (e: FormEvent) => void; children: React.ReactNode; error?: string | null; ocupado?: boolean }) {
+function FormTramo({ p, hecho }: { p: Producto; hecho: () => void }) {
+  const [tipo, setTipo] = useState<"precio" | "descuento">("precio");
+  const [desde, setDesde] = useState("");
+  const [valor, setValor] = useState("");
+  const [error, setError] = useState<string | null>(null);
+  const m = useAccion((b: object) => api.put("/api/tramos", b), "Tramo guardado");
   return (
-    <form onSubmit={onSubmit} className="mt-3 rounded-md border border-regla bg-papel p-3" aria-label={titulo}>
-      <div className="flex flex-wrap items-end gap-3">{children}<Boton type="submit" variante="primario" disabled={ocupado}>{titulo}</Boton></div>
-      {error && <p role="alert" className="mt-2 text-sm text-sale">{error}</p>}
+    <form
+      className="space-y-4"
+      onSubmit={(e) => {
+        e.preventDefault();
+        const d = Number(desde);
+        const cent = tipo === "precio" ? aCent(valor) : null;
+        const bp = tipo === "descuento" ? Math.round(Number(valor.replace(",", ".").replace("%", "")) * 100) : null;
+        if (!Number.isInteger(d) || d < 2) return setError("El tramo empieza como mínimo en 2 unidades.");
+        if (tipo === "precio" && !cent) return setError("Pon el precio por unidad.");
+        if (tipo === "descuento" && !(bp! > 0 && bp! <= 10_000)) return setError("El descuento va de 1 a 100 %.");
+        m.mutate({ productoId: p.id, desdeUds: d, ...(cent ? { precioCent: cent } : { descuentoBp: bp }) }, { onSuccess: hecho });
+      }}
+    >
+      <Opciones etiqueta="Tipo" valor={tipo} onChange={setTipo} opciones={[{ valor: "precio", texto: "Precio por unidad" }, { valor: "descuento", texto: "Descuento %" }]} />
+      <div className="grid grid-cols-2 gap-3">
+        <Campo etiqueta="Desde (uds)" inputMode="numeric" value={desde} onChange={(e) => setDesde(e.target.value)} />
+        <Campo etiqueta={tipo === "precio" ? "Precio por ud" : "Descuento"} inputMode="decimal" value={valor} onChange={(e) => setValor(e.target.value)} sufijo={tipo === "precio" ? "€" : "%"} />
+      </div>
+      {error && <p role="alert" className="text-[14px] font-medium text-sale">{error}</p>}
+      <Boton type="submit" variante="primario" tamano="lg" className="w-full" cargando={m.isPending}>Guardar tramo</Boton>
     </form>
   );
 }
 
-function NuevoTramo({ productoId }: { productoId: number }) {
-  const [desde, setDesde] = useState("");
-  const [valor, setValor] = useState("");
-  const [tipo, setTipo] = useState<"precio" | "descuento">("precio");
-  const [error, setError] = useState<string | null>(null);
-  const m = useCambio((b: object) => api.put("/api/tramos", b));
-  const enviar = (e: FormEvent) => {
-    e.preventDefault();
-    setError(null);
-    const d = Number(desde);
-    if (!Number.isInteger(d) || d < 2) return setError("El tramo empieza como mínimo en 2 unidades.");
-    const cent = tipo === "precio" ? aCent(valor) : null;
-    const bp = tipo === "descuento" ? Math.round(Number(valor.replace(",", ".").replace("%", "")) * 100) : null;
-    if (tipo === "precio" && !cent) return setError("Pon el precio por unidad, p. ej. 20 o 19,50.");
-    if (tipo === "descuento" && !(bp! > 0 && bp! <= 10_000)) return setError("El descuento va de 1 a 100 %.");
-    m.mutate({ productoId, desdeUds: d, ...(cent ? { precioCent: cent } : { descuentoBp: bp }) }, { onSuccess: () => (setDesde(""), setValor("")), onError: (x) => setError(x.message) });
-  };
-  return (
-    <Formulario titulo="Añadir tramo" onSubmit={enviar} error={error} ocupado={m.isPending}>
-      <div className="w-24"><Campo etiqueta="Desde (uds)" inputMode="numeric" value={desde} onChange={(e) => setDesde(e.target.value)} required /></div>
-      <Selector etiqueta="Tipo" valor={tipo} onChange={setTipo} opciones={[{ valor: "precio", texto: "Precio por ud" }, { valor: "descuento", texto: "Descuento %" }]} />
-      <div className="w-28"><Campo etiqueta={tipo === "precio" ? "€ por ud" : "% descuento"} inputMode="decimal" value={valor} onChange={(e) => setValor(e.target.value)} required /></div>
-    </Formulario>
-  );
-}
-
-function CambiarPrecio({ p }: { p: Producto }) {
-  const [precio, setPrecio] = useState("");
-  const [error, setError] = useState<string | null>(null);
-  const m = useCambio((c: number) => api.put(`/api/productos/${p.id}`, { precioCent: c }));
-  return (
-    <Formulario
-      titulo="Cambiar precio de lista"
-      error={error}
-      ocupado={m.isPending}
-      onSubmit={(e) => {
-        e.preventDefault();
-        const c = aCent(precio);
-        if (!c) return setError("Pon el precio por unidad, p. ej. 25 o 24,90.");
-        m.mutate(c, { onSuccess: () => (setPrecio(""), setError(null)), onError: (x) => setError(x.message) });
-      }}
-    >
-      <div className="w-32"><Campo etiqueta="€ por ud" inputMode="decimal" placeholder={(p.precioCent / 100).toString().replace(".", ",")} value={precio} onChange={(e) => setPrecio(e.target.value)} required /></div>
-    </Formulario>
-  );
-}
-
-function NuevaOferta({ productoId }: { productoId: number }) {
-  const [tipo, setTipo] = useState<"nxm" | "pack" | "descuento">("nxm");
+function FormOferta({ p, hecho }: { p: Producto; hecho: () => void }) {
+  const [tipo, setTipo] = useState<"nxm" | "pack" | "descuento">("pack");
   const [n, setN] = useState("");
   const [v, setV] = useState("");
   const [hasta, setHasta] = useState("");
   const [error, setError] = useState<string | null>(null);
-  const m = useCambio((b: object) => api.post("/api/ofertas", b));
-  const enviar = (e: FormEvent) => {
-    e.preventDefault();
-    setError(null);
-    const nn = Number(n);
-    if (!Number.isInteger(nn) || nn < 1) return setError("Pon un número de unidades válido.");
-    const extra =
-      tipo === "nxm" ? { m: Number(v) } : tipo === "pack" ? { precioCent: aCent(v) } : { descuentoBp: Math.round(Number(v.replace(",", ".").replace("%", "")) * 100) };
-    if (tipo === "nxm" && !(extra.m! >= 1 && extra.m! < nn)) return setError("En NxM se pagan menos de las que se llevan (3x2).");
-    if (tipo === "pack" && !extra.precioCent) return setError("Pon el precio del pack.");
-    m.mutate({ productoId, tipo, n: nn, ...extra, hasta: hasta || null }, { onSuccess: () => (setN(""), setV(""), setHasta("")), onError: (x) => setError(x.message) });
-  };
-  const etiquetas = { nxm: ["Se lleva", "Paga"], pack: ["Unidades", "Precio del pack €"], descuento: ["Desde (uds)", "% descuento"] }[tipo];
+  const m = useAccion((b: object) => api.post("/api/ofertas", b), "Oferta creada");
+  const et = { nxm: ["Se lleva", "Paga"], pack: ["Unidades", "Precio del pack"], descuento: ["Desde (uds)", "Descuento"] }[tipo];
   return (
-    <Formulario titulo="Crear oferta" onSubmit={enviar} error={error} ocupado={m.isPending}>
-      <Selector etiqueta="Tipo" valor={tipo} onChange={setTipo} opciones={[{ valor: "nxm", texto: "Lleva N, paga M" }, { valor: "pack", texto: "Pack a precio cerrado" }, { valor: "descuento", texto: "Descuento por volumen" }]} />
-      <div className="w-24"><Campo etiqueta={etiquetas[0]!} inputMode="numeric" value={n} onChange={(e) => setN(e.target.value)} required /></div>
-      <div className="w-32"><Campo etiqueta={etiquetas[1]!} inputMode="decimal" value={v} onChange={(e) => setV(e.target.value)} required /></div>
-      <div className="w-40"><Campo etiqueta="Hasta (opcional)" type="date" value={hasta} onChange={(e) => setHasta(e.target.value)} /></div>
-    </Formulario>
+    <form
+      className="space-y-4"
+      onSubmit={(e) => {
+        e.preventDefault();
+        const nn = Number(n);
+        if (!Number.isInteger(nn) || nn < 1) return setError("Pon un número de unidades válido.");
+        const extra = tipo === "nxm" ? { m: Number(v) } : tipo === "pack" ? { precioCent: aCent(v) } : { descuentoBp: Math.round(Number(v.replace(",", ".").replace("%", "")) * 100) };
+        if (tipo === "nxm" && !(extra.m! >= 1 && extra.m! < nn)) return setError("En NxM se pagan menos de las que se llevan (3x2).");
+        if (tipo === "pack" && !extra.precioCent) return setError("Pon el precio del pack.");
+        m.mutate({ productoId: p.id, tipo, n: nn, ...extra, hasta: hasta || null }, { onSuccess: hecho });
+      }}
+    >
+      <Opciones etiqueta="Tipo de oferta" columnas={3} valor={tipo} onChange={setTipo} opciones={[{ valor: "pack", texto: "Pack", detalle: "N por X €" }, { valor: "nxm", texto: "NxM", detalle: "3x2" }, { valor: "descuento", texto: "Volumen", detalle: "−% desde N" }]} />
+      <div className="grid grid-cols-2 gap-3">
+        <Campo etiqueta={et[0]!} inputMode="numeric" value={n} onChange={(e) => setN(e.target.value)} />
+        <Campo etiqueta={et[1]!} inputMode="decimal" value={v} onChange={(e) => setV(e.target.value)} sufijo={tipo === "pack" ? "€" : tipo === "descuento" ? "%" : undefined} />
+      </div>
+      <Campo etiqueta="Hasta (opcional)" type="date" value={hasta} onChange={(e) => setHasta(e.target.value)} ayuda="Termina sola ese día; el bot avisa 3 días antes." />
+      {error && <p role="alert" className="text-[14px] font-medium text-sale">{error}</p>}
+      <Boton type="submit" variante="primario" tamano="lg" className="w-full" cargando={m.isPending}>Crear oferta</Boton>
+    </form>
   );
 }
 
-function NuevoProducto() {
-  const [nombre, setNombre] = useState("");
-  const [precio, setPrecio] = useState("");
-  const [error, setError] = useState<string | null>(null);
-  const m = useCambio((b: object) => api.post("/api/productos", b));
+function FormPrecio({ p, hecho }: { p: Producto; hecho: () => void }) {
+  const [v, setV] = useState((p.precioCent / 100).toString().replace(".", ","));
+  const m = useAccion((c: number) => api.put(`/api/productos/${p.id}`, { precioCent: c }), "Precio cambiado");
+  const c = aCent(v);
   return (
-    <div className="mt-10">
-      <Seccion titulo="Nuevo producto">
-        <Formulario
-          titulo="Crear producto"
-          error={error}
-          ocupado={m.isPending}
-          onSubmit={(e) => {
-            e.preventDefault();
-            const c = aCent(precio);
-            if (!nombre.trim() || !c) return setError("Pon nombre y precio por unidad.");
-            m.mutate({ nombre: nombre.trim(), precioCent: c }, { onSuccess: () => (setNombre(""), setPrecio(""), setError(null)), onError: (x) => setError(x.message) });
-          }}
-        >
-          <div className="w-56"><Campo etiqueta="Nombre" value={nombre} onChange={(e) => setNombre(e.target.value)} required /></div>
-          <div className="w-28"><Campo etiqueta="€ por ud" inputMode="decimal" value={precio} onChange={(e) => setPrecio(e.target.value)} required /></div>
-        </Formulario>
-      </Seccion>
-    </div>
+    <form className="space-y-4" onSubmit={(e) => (e.preventDefault(), c && m.mutate(c, { onSuccess: hecho }))}>
+      <Campo etiqueta="Precio por unidad" inputMode="decimal" value={v} onChange={(e) => setV(e.target.value)} sufijo="€" error={v && !c ? "Pon un importe válido." : null} className="!text-[24px] font-bold" />
+      <Boton type="submit" variante="primario" tamano="lg" className="w-full" disabled={!c} cargando={m.isPending}>Guardar precio</Boton>
+    </form>
+  );
+}
+
+function FormProducto({ hecho }: { hecho: () => void }) {
+  const [nombre, setNombre] = useState("");
+  const [v, setV] = useState("");
+  const m = useAccion(() => api.post("/api/productos", { nombre: nombre.trim(), precioCent: aCent(v) }), "Producto creado");
+  return (
+    <form className="space-y-4" onSubmit={(e) => (e.preventDefault(), nombre.trim() && aCent(v) && m.mutate(undefined, { onSuccess: hecho }))}>
+      <Campo etiqueta="Nombre" value={nombre} onChange={(e) => setNombre(e.target.value)} maxLength={120} />
+      <Campo etiqueta="Precio por unidad" inputMode="decimal" value={v} onChange={(e) => setV(e.target.value)} sufijo="€" />
+      <Boton type="submit" variante="primario" tamano="lg" className="w-full" disabled={!nombre.trim() || !aCent(v)} cargando={m.isPending}>Crear producto</Boton>
+    </form>
   );
 }

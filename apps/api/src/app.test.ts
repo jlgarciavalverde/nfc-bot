@@ -13,7 +13,7 @@ const ORIGEN = "http://localhost:5173";
 
 beforeAll(async () => {
   ({ db, cerrar } = await bdDeTest());
-  app = await buildApp(db, { ...configFromEnv({}), logLevel: "silent", loginRateLimit: 1000 });
+  app = await buildApp(db, { ...configFromEnv({}), logLevel: "silent", loginRateLimit: 1000, escriturasMin: 10_000 });
 });
 afterAll(async () => {
   await app.close();
@@ -193,7 +193,7 @@ describe("apuntar desde el panel", () => {
     await guardarAjuste(db, "avisosSilenciados", ["panel"]);
     const { cookie } = await entrar(bea);
     await app.inject({ method: "POST", url: "/api/comercios", headers: h(cookie), payload: { nombre: "Y" } });
-    const [a] = await db.select().from(tablas.avisos);
+    const [a] = (await db.select().from(tablas.avisos)).filter((x) => x.tipo === "panel");
     expect(a!.silencioso).toBe(true);
   });
 });

@@ -29,6 +29,13 @@
       "when": 1792574506394,
       "tag": "0003_efimeros",
       "breakpoints": true
+    },
+    {
+      "idx": 4,
+      "version": "7",
+      "when": 1792576276006,
+      "tag": "0004_tandas_placas",
+      "breakpoints": true
     }
   ]
 }

@@ -12,6 +12,8 @@ export interface ApiConfig {
   port: number;
   /** Intentos de entrada (enlace o código) por minuto y IP. */
   loginRateLimit: number;
+  /** Escrituras por socio y minuto. */
+  escriturasMin: number;
 }
 
 export function configFromEnv(env = process.env): ApiConfig {
@@ -26,5 +28,6 @@ export function configFromEnv(env = process.env): ApiConfig {
     logLevel: env.LOG_LEVEL,
     port: Number(env.PORT ?? 3000),
     loginRateLimit: Number(env.LOGIN_RATE_LIMIT ?? 10),
+    escriturasMin: Number(env.ESCRITURAS_MIN ?? 60),
   };
 }
