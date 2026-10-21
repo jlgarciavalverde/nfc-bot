@@ -2,14 +2,14 @@ import { Bot, GrammyError, InlineKeyboard, type Context } from "grammy";
 import type { InlineKeyboardButton, UserFromGetMe } from "grammy/types";
 import { and, eq, gt, isNull, sql } from "drizzle-orm";
 import {
-  altaSocio, cerrarSesionesDe, crearEnlacePanel, deshacerUltima, ErrorNegocio, guardarAjuste, haySocios, hoy as hoyMadrid, html, leerAjustes,
+  altaSocio, cerrarSesionesDe, crearEnlacePanel, deshacerUltima, olvidarEfimero, programarBorrado, ErrorNegocio, guardarAjuste, haySocios, hoy as hoyMadrid, html, leerAjustes,
   listarProductos, marcarHecho, nombresComercios, recientesDeSocio, socioPorTelegram, tablas, MINUTOS_ENLACE, type DB, type Socio,
 } from "@nfc/core";
 import type { BotConfig } from "./config";
 import type { Accion } from "./acciones";
 import { parseComando } from "./comandos";
 import { bienvenida, chuleta } from "./ayuda";
-import { ejecutar, proponer, resolverPendiente, type Respuesta } from "./ejecutor";
+import { ejecutar, proponer, resolverPendiente, MINUTOS_PENDIENTE, type Respuesta } from "./ejecutor";
 import { ErrorIa, type Interprete } from "./ia/interpretar";
 
 export interface Deps {
@@ -48,15 +48,25 @@ export function crearBot(deps: Deps, botInfo?: UserFromGetMe) {
   const ahora = () => deps.now?.() ?? new Date();
   const bot = new Bot<Ctx>(config.botToken || "0:test", botInfo ? { botInfo } : undefined);
 
+  /** Programa el borrado de un mensaje del bot; con `clave`, borra ya los anteriores con esa clave. */
+  async function borrarLuego(chatId: number, messageId: number, enMs: number, clave?: string) {
+    const anteriores = await programarBorrado(db, { chatId, messageId, enMs, clave });
+    for (const m of anteriores) await bot.api.deleteMessage(m.chatId, m.messageId).catch(() => {});
+  }
+
   async function enviar(ctx: Ctx, r: Respuesta) {
     const trozos = trocear(r.texto);
+    // Las preguntas con «Confirmar/Cancelar» que nadie contesta se borran al caducar
+    const conPregunta = r.botones?.some((f) => f.some((b) => /^(ok|no):/.test(b.data)));
+    const efimero = r.efimero ?? (conPregunta ? MINUTOS_PENDIENTE * 60_000 : undefined);
     for (const [i, t] of trozos.entries()) {
-      await ctx.reply(t, {
+      const m = await ctx.reply(t, {
         parse_mode: "HTML",
         link_preview_options: { is_disabled: true },
         reply_markup: i === trozos.length - 1 ? teclado(r) : undefined,
         reply_parameters: ctx.chat?.type !== "private" && ctx.msg?.message_id && i === 0 ? { message_id: ctx.msg.message_id, allow_sending_without_reply: true } : undefined,
       });
+      if (efimero && m?.chat) await borrarLuego(m.chat.id, m.message_id, efimero);
     }
     if (r.grupo && ctx.grupoId) await ctx.api.sendMessage(ctx.grupoId, r.grupo, { parse_mode: "HTML" });
     // Si nunca ha abierto el chat privado con el bot, Telegram no deja escribirle: no pasa nada
@@ -67,7 +77,7 @@ export function crearBot(deps: Deps, botInfo?: UserFromGetMe) {
     try {
       await enviar(ctx, await f());
     } catch (e) {
-      if (e instanceof ErrorNegocio || e instanceof ErrorIa) return enviar(ctx, { texto: `⚠️ ${html(e.message)}` });
+      if (e instanceof ErrorNegocio || e instanceof ErrorIa) return enviar(ctx, { texto: `⚠️ ${html(e.message)}`, efimero: 5 * 60_000 });
       console.error("Error en el bot", e);
       await enviar(ctx, { texto: "😵 Algo ha fallado por mi parte. Si se repite, avisa a quien mantiene el bot." }).catch(() => {});
     }
@@ -136,7 +146,7 @@ export function crearBot(deps: Deps, botInfo?: UserFromGetMe) {
       .from(tablas.pendientes)
       .where(and(eq(tablas.pendientes.telegramId, u.id), isNull(tablas.pendientes.resueltaAt), gt(tablas.pendientes.expiraAt, new Date())))
       .limit(1);
-    if (abierta) return enviar(ctx, { texto: `${html(nombre)}, tu petición ya está hecha: falta que un admin la apruebe.` });
+    if (abierta) return enviar(ctx, { texto: `${html(nombre)}, tu petición ya está hecha: falta que un admin la apruebe.`, efimero: 60_000 });
     // La propuesta la «firma» un admin cualquiera; la puede aprobar cualquier admin.
     const r = await proponer(
       { db, socio: admin, hoy: hoyMadrid(ahora()), origen: "bot" },
@@ -149,7 +159,7 @@ export function crearBot(deps: Deps, botInfo?: UserFromGetMe) {
 
   bot.command("unirme", async (ctx) => {
     if (ctx.chat.id !== ctx.grupoId) return;
-    if (ctx.socio) return ctx.reply("Ya eres socio. 😉");
+    if (ctx.socio) return enviar(ctx, { texto: "Ya eres socio. 😉", efimero: 60_000 });
     await pedirAlta(ctx);
   });
 
@@ -191,24 +201,30 @@ export function crearBot(deps: Deps, botInfo?: UserFromGetMe) {
   bot.command("panel", async (ctx) => {
     if (/^cerrar/i.test(ctx.match.trim())) {
       const n = await cerrarSesionesDe(db, ctx.socio!.id);
-      return ctx.reply(n ? `🔒 He cerrado ${n === 1 ? "tu sesión" : `tus ${n} sesiones`} del panel. Para volver a entrar: /panel` : "No tenías ninguna sesión abierta en el panel.");
+      return enviar(ctx, { texto: n ? `🔒 He cerrado ${n === 1 ? "tu sesión" : `tus ${n} sesiones`} del panel en todos tus dispositivos. Para volver a entrar: /panel` : "No tenías ninguna sesión abierta en el panel.", efimero: 10 * 60_000 });
     }
     const { token, codigo } = await crearEnlacePanel(db, ctx.socio!.id);
     const url = `${config.publicUrl}/entrar#${token}`;
     const texto = [
-      `🔐 <b>Entrar al panel</b> (sirve una vez y caduca en ${MINUTOS_ENLACE} min):`,
-      html(url),
+      "🔐 <b>Entrar al panel</b>",
       "",
-      `Si lo tienes instalado como app, escribe este código: <code>${codigo.slice(0, 4)} ${codigo.slice(4)}</code>`,
+      `👉 Abre este enlace: ${html(url)}`,
+      `📱 O, si lo tienes instalado como app, escribe el código <code>${codigo.slice(0, 4)} ${codigo.slice(4)}</code>`,
       "",
-      "La sesión se queda abierta en ese dispositivo (no hace falta volver a pedir enlace). No lo reenvíes: quien lo abra entra como tú.",
-      "¿Has perdido el móvil? /panel cerrar cierra todas tus sesiones.",
+      `⏱ Tienes <b>${MINUTOS_ENLACE} minutos</b> para usarlo y sirve <b>una sola vez</b>. Si se te pasa, pide otro con /panel.`,
+      "✅ <b>Una vez dentro no tienes que volver a entrar</b>: la sesión se queda abierta en ese móvil u ordenador hasta que cierres sesión (o pase un año sin usarlo).",
+      "💻 Cada dispositivo entra una vez: para otro móvil, el ordenador o la app instalada, pide otro /panel.",
+      "",
+      "🔒 No lo reenvíes: quien lo abra entra como tú. ¿Has perdido el móvil? /panel cerrar cierra todas tus sesiones.",
+      `<i>Este mensaje se borra solo en ${MINUTOS_ENLACE} minutos.</i>`,
     ].join("\n");
     try {
-      await ctx.api.sendMessage(ctx.from!.id, texto, { parse_mode: "HTML", link_preview_options: { is_disabled: true } });
-      if (ctx.chat.type !== "private") await ctx.reply("Te lo he mandado por privado. 📬");
+      const m = await ctx.api.sendMessage(ctx.from!.id, texto, { parse_mode: "HTML", link_preview_options: { is_disabled: true } });
+      // Un solo mensaje de acceso a la vez: el nuevo borra los anteriores; y desaparece al caducar
+      await borrarLuego(m.chat.id, m.message_id, MINUTOS_ENLACE * 60_000, `panel:${ctx.socio!.id}`);
+      if (ctx.chat.type !== "private") await enviar(ctx, { texto: "Te lo he mandado por privado. 📬", efimero: 60_000 });
     } catch {
-      await ctx.reply("No puedo escribirte por privado: ábreme un chat y pulsa Iniciar, y vuelve a pedir /panel.");
+      await enviar(ctx, { texto: "No puedo escribirte por privado: ábreme un chat, pulsa Iniciar y vuelve a pedir /panel.", efimero: 5 * 60_000 });
     }
   });
 
@@ -282,16 +298,23 @@ export function crearBot(deps: Deps, botInfo?: UserFromGetMe) {
     const [tipo, idTxt] = ctx.callbackQuery.data.split(":");
     const id = Number(idTxt);
     try {
-      let r: Respuesta;
-      if (tipo === "ok" || tipo === "no") r = await resolverPendiente({ db, socio: ctx.socio!, hoy: hoyMadrid(ahora()), botUsername: ctx.me.username }, id, tipo === "ok");
-      else if (tipo === "hecho") {
-        const rec = await marcarHecho(db, id, ctx.socio!.id);
-        r = { texto: `✅ Hecho (recordatorio del ${rec.fecha}).` };
-      } else return ctx.answerCallbackQuery();
-      await ctx.answerCallbackQuery();
-      // La pregunta se queda sin botones (salvo la lista de recordatorios, que puede tener más); la respuesta va aparte
-      if (tipo !== "hecho") await ctx.editMessageReplyMarkup({ reply_markup: undefined }).catch(() => {});
-      await enviar(ctx, r);
+      if (tipo === "hecho") {
+        await marcarHecho(db, id, ctx.socio!.id);
+        await ctx.answerCallbackQuery({ text: "✅ Hecho" });
+        // Fuera ese botón; el resto de la lista se queda
+        const filas = (ctx.callbackQuery.message?.reply_markup?.inline_keyboard ?? []).filter((f) => !f.some((b) => "callback_data" in b && b.callback_data === ctx.callbackQuery.data));
+        await ctx.editMessageReplyMarkup({ reply_markup: { inline_keyboard: filas } }).catch(() => {});
+        return;
+      }
+      if (tipo !== "ok" && tipo !== "no") return ctx.answerCallbackQuery();
+      const r = await resolverPendiente({ db, socio: ctx.socio!, hoy: hoyMadrid(ahora()), botUsername: ctx.me.username }, id, tipo === "ok");
+      await ctx.answerCallbackQuery(tipo === "no" ? { text: "Cancelado" } : undefined);
+      // La pregunta ya no sirve: se borra (si Telegram no deja, al menos se le quitan los botones)
+      const msg = ctx.callbackQuery.message;
+      const borrada = msg ? await ctx.deleteMessage().then(() => true, () => false) : false;
+      if (msg && borrada) await olvidarEfimero(db, msg.chat.id, msg.message_id);
+      if (!borrada) await ctx.editMessageReplyMarkup({ reply_markup: undefined }).catch(() => {});
+      if (tipo === "ok") await enviar(ctx, r);
     } catch (e) {
       if (e instanceof ErrorNegocio) return ctx.answerCallbackQuery({ text: e.message, show_alert: true });
       console.error("Error en un botón", e);

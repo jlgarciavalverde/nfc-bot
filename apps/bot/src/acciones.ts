@@ -28,9 +28,11 @@ export const Accion = z.discriminatedUnion("t", [
   z.object({ t: z.literal("pendientes"), todos: z.boolean().optional() }),
   z.object({ t: z.literal("reparto") }),
   z.object({ t: z.literal("socios") }),
+  z.object({ t: z.literal("placa"), codigo: z.string().min(1).max(20) }),
+  z.object({ t: z.literal("placas") }),
   // ── Escrituras ──
   z.object({ t: z.literal("nuevo"), nombre: z.string().min(1).max(120), tipo: texto.optional(), zona: texto.optional(), contacto: texto.optional(), direccion: texto.optional() }),
-  z.object({ t: z.literal("dato"), comercio, campo: z.enum(["tipo", "zona", "direccion", "contacto", "maps", "nota", "nombre"]), valor: texto }),
+  z.object({ t: z.literal("dato"), comercio, campo: z.enum(["tipo", "zona", "direccion", "contacto", "maps", "resenas", "nota", "nombre"]), valor: texto }),
   z.object({ t: z.literal("visita"), comercio, resultado: z.enum(["si", "no", "luego", "interesado"]), nota: texto.optional(), proxima: fecha.optional() }),
   z.object({
     t: z.literal("venta"),
@@ -46,6 +48,8 @@ export const Accion = z.discriminatedUnion("t", [
   z.object({ t: z.literal("movimiento"), tipo: z.enum(["aportacion", "gasto", "ingreso", "retirada"]), cent, categoria: z.string().max(60).optional(), nota: texto.optional() }),
   z.object({ t: z.literal("compra"), uds: z.number().int().positive().max(100_000), cent, proveedor: texto.optional(), producto: z.string().max(120).optional() }),
   z.object({ t: z.literal("recordar"), comercio, fecha, nota: texto.optional() }),
+  z.object({ t: z.literal("asignarPlaca"), codigo: z.string().min(1).max(20), comercio }),
+  z.object({ t: z.literal("quitarPlaca"), codigo: z.string().min(1).max(20) }),
   z.object({ t: z.literal("ubicacion"), comercio: z.number().int().positive(), lat: z.number().min(-90).max(90), lon: z.number().min(-180).max(180) }),
   // ── Solo admin ──
   z.object({ t: z.literal("producto"), nombre: z.string().min(1).max(120), cent, nuevo: z.boolean() }),
@@ -66,5 +70,5 @@ export const Accion = z.discriminatedUnion("t", [
 ]);
 export type Accion = z.infer<typeof Accion>;
 
-export const ESCRITURA = new Set<Accion["t"]>(["nuevo", "dato", "visita", "venta", "cobrado", "movimiento", "compra", "recordar", "ubicacion", "producto", "tramo", "oferta", "quitarOferta", "config", "alta"]);
+export const ESCRITURA = new Set<Accion["t"]>(["nuevo", "dato", "visita", "venta", "cobrado", "movimiento", "compra", "recordar", "ubicacion", "asignarPlaca", "quitarPlaca", "producto", "tramo", "oferta", "quitarOferta", "config", "alta"]);
 export const SOLO_ADMIN = new Set<Accion["t"]>(["producto", "tramo", "oferta", "quitarOferta", "config", "alta"]);

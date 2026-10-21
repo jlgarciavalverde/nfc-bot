@@ -17,3 +17,5 @@ export * from "./servicios/recordatorios";
 export * from "./servicios/resumen";
 export * from "./servicios/panel";
 export * from "./servicios/avisos";
+export * from "./servicios/placas";
+export * from "./servicios/efimeros";

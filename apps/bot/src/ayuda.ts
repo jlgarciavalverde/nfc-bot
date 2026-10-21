@@ -11,6 +11,7 @@ const TEMAS: Record<string, { titulo: string; lineas: string[]; admin?: boolean 
       "/ficha Bar Pepe · /buscar pepe · /zona centro",
       "/lista [pendiente|interesado|si|no|cliente]",
       "/dato Bar Pepe | maps | https://maps.app.goo.gl/…",
+      "/dato Bar Pepe | resenas | https://g.page/r/…/review — enlace de reseñas de Google (para sus placas)",
       "/embudo — cuántos en cada estado y conversión",
       "Mándame una 📍 ubicación y la guardo en el comercio que elijas.",
     ],
@@ -23,6 +24,15 @@ const TEMAS: Record<string, { titulo: string; lineas: string[]; admin?: boolean 
       "/venta Bar Pepe 5 por 90€ pagado — precio pactado",
       "/ventas · /ventas pendientes",
       "La venta aplica el mejor precio, descuenta stock, apunta el ingreso y marca el comercio como cliente.",
+    ],
+  },
+  placas: {
+    titulo: "🪧 Placas",
+    lineas: [
+      "/placa K7M2Q Bar Pepe — la placa con ese código (en la tapa de detrás) lleva a las reseñas de Bar Pepe",
+      "/placa K7M2Q — a quién está asignada y cuántas veces la han escaneado",
+      "/placa K7M2Q quitar — deja de redirigir · /placas — todas, con sus escaneos",
+      "Las placas se imprimen sin saber para quién son: al venderla, asígnala y apunta el enlace de reseñas del comercio con /dato.",
     ],
   },
   precios: {

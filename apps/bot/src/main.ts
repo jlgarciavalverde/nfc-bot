@@ -30,6 +30,7 @@ await bot.api.setMyCommands([
   { command: "precio", description: "Precio para N paneles" },
   { command: "precios", description: "Tabla de precios y ofertas" },
   { command: "ficha", description: "Ficha de un comercio" },
+  { command: "placa", description: "Asignar una placa: /placa K7M2Q Bar Pepe" },
   { command: "embudo", description: "Comercios por estado" },
   { command: "caja", description: "Resumen de caja" },
   { command: "stock", description: "Paneles en stock" },

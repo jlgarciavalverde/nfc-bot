@@ -1,6 +1,6 @@
 import { and, desc, eq, gt, inArray, isNull, ne, sql } from "drizzle-orm";
 import type { DB, Tx } from "../db/client";
-import { comercios, consumos, lotes, movimientos, operaciones, recordatorios, socios, ventas, visitas } from "../db/schema";
+import { comercios, consumos, lotes, movimientos, operaciones, placas, recordatorios, socios, ventas, visitas } from "../db/schema";
 import { ErrorNegocio } from "./errores";
 
 type EstadoComercio = (typeof comercios.$inferSelect)["estado"];
@@ -12,7 +12,8 @@ export type Deshacer =
   | { t: "movimiento"; movimientoId: number }
   | { t: "visita"; visitaId: number; comercioId: number; estadoPrevio: EstadoComercio; motivoPrevio: string | null; responsablePrevio: number | null; recordatoriosCerrados?: number[] }
   | { t: "lote"; loteId: number; movimientoId: number }
-  | { t: "comercio"; comercioId: number };
+  | { t: "comercio"; comercioId: number }
+  | { t: "placa"; placaId: number; comercioPrevio: number | null; asignadaPorPrevio: number | null; asignadaAtPrevio: string | null };
 
 export async function registrarOperacion(tx: Tx, o: { socioId: number | null; tipo: string; resumen: string; deshacer?: Deshacer; origen?: string }) {
   await tx.insert(operaciones).values({ socioId: o.socioId, tipo: o.tipo, resumen: o.resumen, deshacer: o.deshacer ?? null, origen: o.origen ?? "bot" });
@@ -74,6 +75,12 @@ export async function deshacerUltima(db: DB, socioId: number, now = new Date()) 
         await tx.update(comercios).set({ anuladoAt: ahora }).where(eq(comercios.id, d.comercioId));
         break;
       }
+      case "placa":
+        await tx
+          .update(placas)
+          .set({ comercioId: d.comercioPrevio, asignadaPor: d.asignadaPorPrevio, asignadaAt: d.asignadaAtPrevio ? new Date(d.asignadaAtPrevio) : null })
+          .where(eq(placas.id, d.placaId));
+        break;
     }
     await tx.update(operaciones).set({ deshechaAt: ahora }).where(eq(operaciones.id, op.id));
     await registrarOperacion(tx, { socioId, tipo: "deshacer", resumen: `Deshecho: ${op.resumen}` });

@@ -1,10 +1,11 @@
 import { and, asc, desc, eq, isNull, sql } from "drizzle-orm";
 import type { Tx } from "../db/client";
-import { comercios, recordatorios, socios, ventas, visitas } from "../db/schema";
+import { comercios, placas, recordatorios, socios, ventas, visitas } from "../db/schema";
 import { hoy as hoyMadrid, sumarDias } from "../fechas";
 import { normalizar } from "../texto";
 import { ErrorNegocio } from "./errores";
 import { registrarOperacion } from "./operaciones";
+import { validarEnlaceResenas } from "./placas";
 
 export type Comercio = typeof comercios.$inferSelect;
 export type EstadoComercio = Comercio["estado"];
@@ -67,7 +68,7 @@ export async function crearComercio(db: Tx, d: DatosComercio, socioId: number, o
   return c!;
 }
 
-export const CAMPOS_COMERCIO = { tipo: "tipo", zona: "zona", direccion: "direccion", contacto: "contacto", maps: "mapsUrl", nota: "nota", nombre: "nombre" } as const;
+export const CAMPOS_COMERCIO = { tipo: "tipo", zona: "zona", direccion: "direccion", contacto: "contacto", maps: "mapsUrl", resenas: "resenasUrl", nota: "nota", nombre: "nombre" } as const;
 export type CampoComercio = keyof typeof CAMPOS_COMERCIO;
 
 export async function cambiarDatoComercio(db: Tx, comercioId: number, campo: CampoComercio, valor: string, socioId: number, origen = "bot") {
@@ -75,6 +76,7 @@ export async function cambiarDatoComercio(db: Tx, comercioId: number, campo: Cam
   const v = valor.trim() || null;
   if (v && v.length > 500) throw new ErrorNegocio("Ese texto es demasiado largo.");
   if (col === "mapsUrl" && v && !/^https:\/\//.test(v)) throw new ErrorNegocio("El enlace de Google Maps tiene que empezar por https://");
+  if (col === "resenasUrl" && v) validarEnlaceResenas(v);
   const set: Partial<Comercio> = { [col]: v, actualizadoAt: new Date() };
   if (col === "nombre") {
     if (!v) throw new ErrorNegocio("El nombre no puede quedar vacío.");
@@ -138,7 +140,7 @@ export async function registrarVisita(
 
 export async function fichaComercio(db: Tx, comercioId: number) {
   const c = await comercioPorId(db, comercioId);
-  const [vs, vts, recs, resp] = await Promise.all([
+  const [vs, vts, recs, resp, pls] = await Promise.all([
     db
       .select({ fecha: visitas.fecha, resultado: visitas.resultado, nota: visitas.nota, socio: socios.nombre })
       .from(visitas)
@@ -149,8 +151,9 @@ export async function fichaComercio(db: Tx, comercioId: number) {
     db.select().from(ventas).where(and(eq(ventas.comercioId, c.id), isNull(ventas.anuladoAt))).orderBy(desc(ventas.id)),
     db.select().from(recordatorios).where(and(eq(recordatorios.comercioId, c.id), isNull(recordatorios.hechoAt), isNull(recordatorios.anuladoAt))),
     c.responsableId ? db.select({ nombre: socios.nombre }).from(socios).where(eq(socios.id, c.responsableId)) : Promise.resolve([]),
+    db.select({ codigo: placas.codigo, escaneos: placas.escaneos, ultimoEscaneoAt: placas.ultimoEscaneoAt }).from(placas).where(eq(placas.comercioId, c.id)).orderBy(asc(placas.codigo)),
   ]);
-  return { comercio: c, visitas: vs, ventas: vts, recordatorios: recs, responsable: resp[0]?.nombre ?? null };
+  return { comercio: c, visitas: vs, ventas: vts, recordatorios: recs, responsable: resp[0]?.nombre ?? null, placas: pls };
 }
 
 export async function listarComercios(db: Tx, f: { estado?: EstadoComercio; zona?: string } = {}) {

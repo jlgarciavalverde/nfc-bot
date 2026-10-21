@@ -6,7 +6,8 @@ import { comercios, lotes, movimientos, recordatorios, ventas } from "./db/schem
 import {
   altaSocio, apuntarMovimiento, comprarLote, crearComercio, crearOferta, crearProducto, deshacerUltima, embudo, estadoStock,
   guardarTramo, marcarCobrada, recordatoriosPendientes, registrarVenta, registrarVisita, reparto, resumenCaja, buscarComercio,
-  guardarAjuste, resumenPeriodo, ErrorNegocio, type Socio, type Producto,
+  guardarAjuste, resumenPeriodo, ErrorNegocio, asignarPlaca, quitarPlaca, escanearPlaca, infoPlaca, listarPlacas, cambiarDatoComercio,
+  caracterControl, normalizarCodigo, fichaComercio, type Socio, type Producto,
 } from "./index";
 
 let db: DB;
@@ -162,4 +163,46 @@ it("recordatorios no salen si el comercio se anula", async () => {
   await db.insert(recordatorios).values({ comercioId: c.id, socioId: ana.id, fecha: "2026-10-21" });
   await db.update(comercios).set({ anuladoAt: new Date() });
   expect(await recordatoriosPendientes(db, "2026-10-21")).toHaveLength(0);
+});
+
+describe("placas", () => {
+  const codigo = (base: string) => base + caracterControl(base);
+  it("el carácter de control detecta un carácter cambiado y dos intercambiados", () => {
+    const c = codigo("K7M2");
+    expect(normalizarCodigo(c.toLowerCase())).toBe(c);
+    expect(normalizarCodigo(`${c.slice(0, 2)}-${c.slice(2)}`)).toBe(c);
+    expect(normalizarCodigo("K7M3" + c[4])).toBeNull();
+    expect(normalizarCodigo("7KM2" + c[4])).toBeNull();
+    expect(normalizarCodigo("K7M2")).toBeNull();
+    expect(normalizarCodigo("K0M2X")).toBeNull();
+  });
+  it("asignar, escanear, reasignar, deshacer y quitar", async () => {
+    const pepe = await crearComercio(db, { nombre: "Bar Pepe" }, ana.id);
+    const lola = await crearComercio(db, { nombre: "Peluquería Lola" }, ana.id);
+    const c = codigo("K7M2");
+    expect(await escanearPlaca(db, c)).toEqual({ motivo: "sin_asignar" });
+    expect(await escanearPlaca(db, "XXXXX")).toEqual({ motivo: "invalida" });
+    const mal = c.slice(0, 4) + (c[4] === "A" ? "B" : "A");
+    await expect(asignarPlaca(db, mal, pepe.id, ana.id)).rejects.toThrow(ErrorNegocio);
+
+    await asignarPlaca(db, c.toLowerCase(), pepe.id, bea.id);
+    expect(await escanearPlaca(db, c)).toEqual({ motivo: "sin_enlace", comercio: "Bar Pepe" });
+    await expect(cambiarDatoComercio(db, pepe.id, "resenas", "http://g.page/x", ana.id)).rejects.toThrow(ErrorNegocio);
+    await cambiarDatoComercio(db, pepe.id, "resenas", "https://g.page/r/pepe/review", ana.id);
+    expect(await escanearPlaca(db, c)).toEqual({ url: "https://g.page/r/pepe/review" });
+    expect((await infoPlaca(db, c)).placa?.escaneos).toBe(2);
+    expect((await fichaComercio(db, pepe.id)).placas).toMatchObject([{ codigo: c, escaneos: 2 }]);
+
+    await expect(asignarPlaca(db, c, pepe.id, ana.id)).rejects.toThrow("ya es de Bar Pepe");
+    const r = await asignarPlaca(db, c, lola.id, ana.id);
+    expect(r.antes?.nombre).toBe("Bar Pepe");
+    expect((await listarPlacas(db)).map((p) => p.comercio)).toEqual(["Peluquería Lola"]);
+    await deshacerUltima(db, ana.id);
+    expect((await infoPlaca(db, c)).comercio).toBe("Bar Pepe");
+
+    await quitarPlaca(db, c, bea.id);
+    expect(await escanearPlaca(db, c)).toEqual({ motivo: "sin_asignar" });
+    await deshacerUltima(db, bea.id);
+    expect((await infoPlaca(db, c)).comercio).toBe("Bar Pepe");
+  });
 });

@@ -1,7 +1,7 @@
 import type { Api } from "grammy";
 import { and, asc, eq, isNotNull, isNull, lte } from "drizzle-orm";
 import {
-  avisar, avisosPorEnviar, describirOferta, euros, fechaCorta, html, leerAjustes, listarSocios, lunes, marcarAviso, pct, plural,
+  avisar, avisosPorEnviar, efimerosVencidos, programarBorrado, describirOferta, euros, fechaCorta, html, leerAjustes, listarSocios, lunes, marcarAviso, pct, plural,
   purgarCaducados, reclamarEnvio, recordatoriosPendientes, relojMadrid, resumenPeriodo, sumarDias, tablas, ultimoAviso, type DB,
 } from "@nfc/core";
 
@@ -16,7 +16,7 @@ const HORA_AVISOS = 9;
  * (3 días antes y al terminar, al buzón de avisos); los lunes, el resumen de la semana anterior en el grupo.
  * Cada aviso se marca como enviado en la BD: un reinicio no lo repite y si el bot arranca por la tarde no llega tarde.
  */
-export async function tick(db: DB, api: Pick<Api, "sendMessage">, now = new Date()) {
+export async function tick(db: DB, api: Pick<Api, "sendMessage"> & Partial<Pick<Api, "deleteMessage">>, now = new Date()) {
   const { fecha, hora, diaSemana } = relojMadrid(now);
   const enviados: string[] = [];
   if (hora < HORA_AVISOS || hora >= 12) return enviados;
@@ -59,7 +59,12 @@ export async function tick(db: DB, api: Pick<Api, "sendMessage">, now = new Date
     const reply_markup = { inline_keyboard: lista.slice(0, 8).map((r) => [{ text: `✅ Hecho: ${r.comercio}`.slice(0, 60), callback_data: `hecho:${r.id}` }]) };
     const texto = partes.join("\n");
     try {
-      await api.sendMessage(socio.telegramId, texto, { parse_mode: "HTML", reply_markup });
+      const m = await api.sendMessage(socio.telegramId, texto, { parse_mode: "HTML", reply_markup });
+      // El de mañana sustituye a este (no se van acumulando «Hoy te toca» de días pasados)
+      if (m?.message_id) {
+        const viejos = await programarBorrado(db, { chatId: socio.telegramId, messageId: m.message_id, enMs: 47 * 3600_000, clave: `dia:${socio.id}` });
+        for (const v of viejos) await api.deleteMessage?.(v.chatId, v.messageId).catch(() => {});
+      }
     } catch {
       // No ha abierto nunca el chat privado con el bot: se le avisa en el grupo
       if (grupoChatId) await api.sendMessage(grupoChatId, `${html(socio.nombre)}, ${texto}\n\n(Ábreme un chat privado para recibir esto solo tú.)`, { parse_mode: "HTML" }).catch(() => {});
@@ -157,6 +162,13 @@ export async function enviarAvisos(db: DB, api: Pick<Api, "sendMessage">) {
   return enviados;
 }
 
+/** Borra los mensajes del bot cuyo momento ha llegado (enlaces del panel caducados, errores, preguntas sin contestar…). */
+export async function borrarVencidos(db: DB, api: Pick<Api, "deleteMessage">) {
+  const vencidos = await efimerosVencidos(db).catch(() => []);
+  for (const m of vencidos) await api.deleteMessage(m.chatId, m.messageId).catch(() => {});
+  return vencidos.length;
+}
+
 export function arrancarProgramador(db: DB, api: Api) {
   const correr = () => tick(db, api).catch((e) => console.error("Error en los avisos programados", e));
   void correr();
@@ -169,6 +181,6 @@ export function arrancarProgramador(db: DB, api: Api) {
     await enviarAvisos(db, api).catch((e) => console.error("Error enviando avisos", e));
     enCurso = false;
   };
-  const t2 = setInterval(buzon, 10_000);
+  const t2 = setInterval(() => void buzon().then(() => borrarVencidos(db, api)), 10_000);
   return () => (clearInterval(t1), clearInterval(t2));
 }

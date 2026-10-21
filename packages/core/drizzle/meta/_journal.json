@@ -15,6 +15,20 @@
       "when": 1792573563190,
       "tag": "0001_avisos_y_sesiones",
       "breakpoints": true
+    },
+    {
+      "idx": 2,
+      "version": "7",
+      "when": 1792574438787,
+      "tag": "0002_placas",
+      "breakpoints": true
+    },
+    {
+      "idx": 3,
+      "version": "7",
+      "when": 1792574506394,
+      "tag": "0003_efimeros",
+      "breakpoints": true
     }
   ]
 }

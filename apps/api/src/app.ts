@@ -8,7 +8,7 @@ import fastifyStatic from "@fastify/static";
 import { sql } from "drizzle-orm";
 import { z } from "zod";
 import {
-  borrarTramo, canjearCodigo, canjearEnlace, cerrarSesionesDe, sesionesDe, cambiarPrecio, cerrarSesion, crearOferta, crearProducto, describirOferta, embudo, ErrorNegocio, estadoStock,
+  borrarTramo, canjearCodigo, escanearPlaca, html, canjearEnlace, cerrarSesionesDe, sesionesDe, cambiarPrecio, cerrarSesion, crearOferta, crearProducto, describirOferta, embudo, ErrorNegocio, estadoStock,
   fichaComercio, guardarTramo, hoy, listarLotes, listarMovimientos, listarProductos, listarVentas, ofertasDe, quitarOferta,
   recordatoriosPendientes, reparto, resumenCaja, resumenPeriodo, lunes, sumarDias, socioDeSesion, tramosDe, DIAS_SESION, type DB, type Socio,
 } from "@nfc/core";
@@ -106,6 +106,23 @@ export async function buildApp(db: DB, config: ApiConfig) {
     }
     return { version: config.version, db: dbOk };
   });
+
+  // ── Placas: el QR y la pegatina NFC llevan /r/<código> (en mayúsculas en el QR: sale más pequeño) ──
+  const placa = async (req: FastifyRequest, reply: FastifyReply) => {
+    const { codigo } = z.object({ codigo: z.string().max(20) }).parse(req.params);
+    const r = await escanearPlaca(db, codigo);
+    reply.header("cache-control", "no-store");
+    if ("url" in r) return reply.redirect(r.url, 302);
+    const texto = {
+      invalida: "Este enlace no corresponde a ninguna placa.",
+      sin_asignar: "Esta placa todavía no está activada.",
+      sin_enlace: `${r.comercio ? html(r.comercio) : "Este comercio"} aún no tiene configurado su enlace de reseñas.`,
+    }[r.motivo];
+    return reply.status(r.motivo === "invalida" ? 404 : 200).type("text/html; charset=utf-8").send(paginaPlaca(texto));
+  };
+  const limitePlacas = { config: { rateLimit: { max: 60, timeWindow: "1 minute", allowList: () => false } } };
+  app.get("/r/:codigo", limitePlacas, placa);
+  app.get("/R/:codigo", limitePlacas, placa);
 
   // ── Sesión ──
   // Con el enlace del bot (token) o con su código de 8 cifras (app instalada). Límite estricto: 10 intentos por minuto.
@@ -262,6 +279,13 @@ export async function buildApp(db: DB, config: ApiConfig) {
   }
   return app;
 }
+
+/** Página mínima para una placa que aún no redirige (la ve el cliente del comercio, no un socio). */
+const paginaPlaca = (texto: string) => `<!doctype html>
+<html lang="es"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>Reseñas</title>
+<style>body{margin:0;min-height:100vh;display:grid;place-items:center;font:17px/1.5 system-ui,sans-serif;background:#faf9f6;color:#1d1d1f}
+main{max-width:22rem;padding:2rem;text-align:center}p{margin:.5rem 0}.s{color:#6b6b6b;font-size:15px}</style></head>
+<body><main><p>★★★★★</p><p>${texto}</p><p class="s">Vuelve a probar en unos días. ¡Gracias!</p></main></body></html>`;
 
 const publico = (s: Socio) => ({ id: s.id, nombre: s.nombre, rol: s.rol });
 

@@ -39,7 +39,7 @@ export const ESQUEMA = {
     producto: { type: "STRING" },
     categoria: { type: "STRING", description: "Categoría del gasto en una palabra (imprenta, gasolina, stock, publicidad…)" },
     proveedor: { type: "STRING" },
-    campo: { type: "STRING", enum: ["tipo", "zona", "direccion", "contacto", "maps", "nota", "nombre"] },
+    campo: { type: "STRING", enum: ["tipo", "zona", "direccion", "contacto", "maps", "resenas", "nota", "nombre"] },
     valor: { type: "STRING" },
     texto: { type: "STRING", description: "Texto a buscar" },
     venta_id: { type: "INTEGER" },

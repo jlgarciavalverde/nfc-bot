@@ -3,6 +3,12 @@
 Lo que el bot anuncia en el grupo al actualizarse (`tools/deploy.mjs` publica la sección de la versión que despliega).
 Frases cortas, para los socios, sin tecnicismos.
 
+## 0.4.0
+- Menos ruido en los chats: borro yo solo los mensajes que ya no sirven (enlaces del panel caducados, preguntas ya contestadas, errores y el aviso de ayer).
+- El mensaje de /panel explica mejor cómo entrar: el enlace caduca en 15 minutos si no lo abres, pero una vez dentro no hace falta volver a entrar.
+- Placas con código: cada placa lleva un código (QR y NFC) que manda a las reseñas de Google del comercio al que se la asignéis. /placa K7M2Q Bar Pepe para asignarla, /placas para verlas, y cuento los escaneos.
+- Para que funcionen, pon el enlace de reseñas del comercio: /dato Bar Pepe | resenas | https://…
+
 ## 0.3.0
 - Os aviso en el grupo de lo automático: cambios hechos desde el panel web, ofertas a punto de terminar y copias de seguridad que fallen (a los admins).
 - Cada mañana, junto a los comercios a los que volver, te recuerdo las ventas tuyas que llevan más de 7 días sin cobrar.

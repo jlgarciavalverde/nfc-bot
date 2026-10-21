@@ -8,7 +8,8 @@ export const USO: Record<string, string> = {
   buscar: "/buscar pepe",
   zona: "/zona centro",
   nuevo: "/nuevo Bar Pepe | bar | centro | 600123123",
-  dato: "/dato Bar Pepe | contacto | Pepe 600123123   (campos: tipo, zona, direccion, contacto, maps, nota, nombre)",
+  dato: "/dato Bar Pepe | contacto | Pepe 600123123   (campos: tipo, zona, direccion, contacto, maps, resenas, nota, nombre)",
+  placa: "/placa K7M2Q Bar Pepe — asignar   ·   /placa K7M2Q — ver   ·   /placa K7M2Q quitar",
   visita: "/visita Bar Pepe no muy caro   ·   /visita Bar Pepe luego volver en 2 semanas   ·   /visita Bar Pepe si",
   venta: "/venta Bar Pepe 3 pagado bizum   ·   /venta Bar Pepe 3 pendiente   ·   /venta Bar Pepe 5 por 90€ pagado",
   cobrado: "/cobrado 12 bizum   (número de la venta, lo ves en /ventas)",
@@ -148,6 +149,16 @@ export function parseComando(cmd: string, args: string, hoy: string): Accion | n
       return { t: "reparto" };
     case "socios":
       return { t: "socios" };
+    case "placas":
+      return { t: "placas" };
+    case "placa": {
+      const [codigo, ...resto] = palabras;
+      if (!codigo) throw falta("placa");
+      const c = resto.join(" ");
+      if (!c) return { t: "placa", codigo };
+      if (["quitar", "liberar", "borrar"].includes(normalizar(c))) return { t: "quitarPlaca", codigo };
+      return { t: "asignarPlaca", codigo, comercio: c };
+    }
 
     case "nuevo": {
       const [nombre, tipo, zona, contacto, direccion] = partes(a);
@@ -156,7 +167,7 @@ export function parseComando(cmd: string, args: string, hoy: string): Accion | n
     }
     case "dato": {
       const [c, campo, ...valor] = partes(a);
-      const campos = ["tipo", "zona", "direccion", "contacto", "maps", "nota", "nombre"] as const;
+      const campos = ["tipo", "zona", "direccion", "contacto", "maps", "resenas", "nota", "nombre"] as const;
       const k = campos.find((x) => x === normalizar(campo ?? ""));
       if (!c || !k) throw falta("dato");
       return { t: "dato", comercio: c, campo: k, valor: valor.join(" | ") };

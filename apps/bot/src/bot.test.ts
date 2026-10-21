@@ -1,6 +1,6 @@
 import { afterAll, beforeAll, beforeEach, describe, expect, it } from "vitest";
 import type { Update } from "grammy/types";
-import { avisar, estadoStock, leerAjustes, resumenCaja, tablas, type DB } from "@nfc/core";
+import { avisar, caracterControl, estadoStock, leerAjustes, resumenCaja, tablas, type DB } from "@nfc/core";
 import { bdDeTest, vaciar } from "@nfc/core/testing";
 import { crearBot } from "./bot";
 import { configFromEnv } from "./config";
@@ -288,5 +288,27 @@ describe("avisos programados", () => {
     const resumen = enviados.find((e) => e.chat_id === GRUPO)!;
     expect(resumen.text).toContain("Semana del 19 oct al 25 oct");
     expect(resumen.text).toContain("Visitas: <b>1</b>");
+  });
+});
+
+describe("placas", () => {
+  it("asignar con el comercio por crear, enlace de reseñas, ver, listar y quitar", async () => {
+    await montar();
+    const codigo = "K7M2" + caracterControl("K7M2");
+    const mal = codigo.slice(0, 4) + (codigo[4] === "Z" ? "Y" : "Z");
+    expect(textos(await escribir(BEA, GRUPO, `/placa ${mal} Bar Pepe`))[0]).toContain("no es un código de placa válido");
+    expect(textos(await escribir(BEA, GRUPO, `/placa ${codigo}`))[0]).toContain("está libre");
+
+    const r = await escribir(BEA, GRUPO, `/placa ${codigo.toLowerCase()} Bar Pepe`);
+    const crear = botones(r).find((x) => x.text.includes("Crear"))!;
+    expect(textos(await pulsar(BEA, GRUPO, crear.callback_data))[0]).toContain("Falta su enlace de reseñas");
+
+    expect(textos(await escribir(BEA, GRUPO, "/dato Bar Pepe | resenas | https://g.page/r/pepe/review"))[0]).toContain("resenas actualizado");
+    expect(textos(await escribir(BEA, GRUPO, `/placa ${codigo}`))[0]).toContain("Lleva a: https://g.page/r/pepe/review");
+    expect(textos(await escribir(BEA, GRUPO, "/placas"))[0]).toContain(`${codigo} Bar Pepe: 0`);
+    expect(textos(await escribir(BEA, GRUPO, "/ficha Bar Pepe"))[0]).toContain(`Placas: ${codigo} (0 escaneos)`);
+
+    expect(textos(await escribir(BEA, GRUPO, `/placa ${codigo} quitar`))[0]).toContain("quitada de <b>Bar Pepe</b>");
+    expect(textos(await escribir(BEA, GRUPO, "/placas"))[0]).toContain("Aún no hay placas asignadas");
   });
 });

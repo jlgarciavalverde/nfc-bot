@@ -1,6 +1,6 @@
 import { afterAll, beforeAll, beforeEach, describe, expect, it } from "vitest";
 import ExcelJS from "exceljs";
-import { altaSocio, guardarAjuste, resumenCaja, tablas, crearComercio, crearEnlacePanel, crearProducto, registrarVenta, registrarVisita, type DB, type Socio } from "@nfc/core";
+import { altaSocio, asignarPlaca, caracterControl, cambiarDatoComercio, guardarAjuste, resumenCaja, tablas, crearComercio, crearEnlacePanel, crearProducto, registrarVenta, registrarVisita, type DB, type Socio } from "@nfc/core";
 import { bdDeTest, vaciar } from "@nfc/core/testing";
 import { buildApp } from "./app";
 import { configFromEnv } from "./config";
@@ -195,5 +195,31 @@ describe("apuntar desde el panel", () => {
     await app.inject({ method: "POST", url: "/api/comercios", headers: h(cookie), payload: { nombre: "Y" } });
     const [a] = await db.select().from(tablas.avisos);
     expect(a!.silencioso).toBe(true);
+  });
+});
+
+describe("placas", () => {
+  it("/r/<código> redirige al enlace de reseñas del comercio y cuenta el escaneo", async () => {
+    const codigo = "K7M2" + caracterControl("K7M2");
+    expect((await app.inject({ url: `/r/${codigo}` })).body).toContain("todavía no está activada");
+    expect((await app.inject({ url: "/r/XXXXX" })).statusCode).toBe(404);
+    const c = await crearComercio(db, { nombre: "Bar <Pepe>" }, ana.id);
+    await asignarPlaca(db, codigo, c.id, ana.id);
+    const sin = await app.inject({ url: `/r/${codigo}` });
+    expect(sin.body).toContain("Bar &lt;Pepe&gt; aún no tiene");
+    await cambiarDatoComercio(db, c.id, "resenas", "https://g.page/r/pepe/review", ana.id);
+    for (const url of [`/r/${codigo.toLowerCase()}`, `/R/${codigo}`]) {
+      const r = await app.inject({ url });
+      expect(r.statusCode).toBe(302);
+      expect(r.headers.location).toBe("https://g.page/r/pepe/review");
+      expect(r.headers["cache-control"]).toBe("no-store");
+    }
+    const [p] = await db.select().from(tablas.placas);
+    expect(p!.escaneos).toBe(3);
+  });
+  it("límite de 60 escaneos por minuto e IP", async () => {
+    let ultimo = 0;
+    for (let i = 0; i < 61; i++) ultimo = (await app.inject({ url: "/r/XXXXX", remoteAddress: "10.0.0.9" })).statusCode;
+    expect(ultimo).toBe(429);
   });
 });

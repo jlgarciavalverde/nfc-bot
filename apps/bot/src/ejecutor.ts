@@ -1,6 +1,6 @@
 import { and, eq, gt, isNull, sql } from "drizzle-orm";
 import {
-  altaSocio, apuntarMovimiento, avisar, TIPOS_AVISO, buscarComercio, cambiarDatoComercio, cambiarPrecio, cambiarSocio, comercioPorId, comprarLote,
+  altaSocio, apuntarMovimiento, asignarPlaca, infoPlaca, normalizarCodigo, listarPlacas, quitarPlaca, avisar, TIPOS_AVISO, buscarComercio, cambiarDatoComercio, cambiarPrecio, cambiarSocio, comercioPorId, comprarLote,
   crearComercio, crearOferta, crearProducto, crearRecordatorio, describirOferta, embudo, ErrorNegocio, ESTADOS, estadoStock, euros,
   fechaCorta, fichaComercio, guardarAjuste, guardarTramo, borrarTramo, html, leerAjustes, listarComercios, listarMovimientos,
   listarProductos, listarSocios, listarVentas, marcarCobrada, ofertasDe, parsePorcentaje, pct, plural, ponerUbicacion,
@@ -22,6 +22,8 @@ export interface Respuesta {
   grupo?: string;
   /** Mensaje por privado a alguien (si no ha abierto el chat con el bot, se ignora). */
   privado?: { telegramId: number; texto: string };
+  /** Borrar el mensaje solo pasados estos ms (errores, avisos de un momento). */
+  efimero?: number;
 }
 export interface Contexto {
   db: DB;
@@ -41,7 +43,8 @@ interface Pendiente {
   lote: string;
 }
 
-const MINUTOS_PENDIENTE = 30;
+export const MINUTOS_PENDIENTE = 30;
+const USO_PLACA = "Así: /placa K7M2Q Bar Pepe (el código está en la tapa de detrás de la placa).";
 const { pendientes } = tablas;
 
 async function proponer(ctx: Contexto, texto: string, opciones: { etiqueta: string; p: Omit<Pendiente, "lote"> }[], telegramId?: number): Promise<Respuesta> {
@@ -130,6 +133,8 @@ async function describir(ctx: Contexto, a: Accion): Promise<string> {
       return `Crear el comercio ${b(a.nombre)}${a.zona ? ` en ${html(a.zona)}` : ""}`;
     case "dato":
       return `Cambiar ${a.campo} de ${b(c)} a «${html(a.valor)}»`;
+    case "asignarPlaca":
+      return `Asignar la placa ${b(a.codigo.toUpperCase())} a ${b(c)}`;
     case "recordar":
       return `Recordatorio para ${b(c)} el ${fechaCorta(a.fecha)}${a.nota ? `: ${html(a.nota)}` : ""}`;
     default:
@@ -174,12 +179,14 @@ export async function ejecutar(ctx: Contexto, entrada: Accion): Promise<Respuest
       const datos = [c.tipo, c.zona, c.direccion].filter(Boolean).map((x) => html(x)).join(" · ");
       if (datos) l.push(datos);
       if (c.contacto) l.push(`📞 ${html(c.contacto)}`);
+      if (c.resenasUrl) l.push(`⭐ <a href="${html(c.resenasUrl)}">Enlace de reseñas</a>`);
       if (c.mapsUrl) l.push(`📍 <a href="${html(c.mapsUrl)}">Google Maps</a>`);
       else if (c.lat != null) l.push(`📍 <a href="https://www.google.com/maps?q=${c.lat},${c.lon}">Ubicación</a>`);
       if (f.responsable) l.push(`Lo lleva: ${html(f.responsable)}`);
       if (c.estado === "no" && c.motivoNo) l.push(`Motivo del no: ${html(c.motivoNo)}`);
       if (c.nota) l.push(`Nota: ${html(c.nota)}`);
       if (f.recordatorios.length) l.push(`⏰ Volver el ${f.recordatorios.map((r) => fechaCorta(r.fecha)).join(", ")}`);
+      if (f.placas.length) l.push(`🪧 Placas: ${f.placas.map((p) => `${p.codigo} (${plural(p.escaneos, "escaneo", "escaneos")})`).join(", ")}`);
       if (f.ventas.length) {
         l.push("", b("Ventas"));
         for (const v of f.ventas) l.push(`#${v.id} ${fechaCorta(v.fecha)}: ${v.uds} uds, ${euros(v.totalCent)}${v.cobrada ? "" : " ⏳ pendiente"}`);
@@ -277,7 +284,41 @@ export async function ejecutar(ctx: Contexto, entrada: Accion): Promise<Respuest
       };
     }
 
+    case "placa": {
+      const p = await infoPlaca(db, a.codigo);
+      if (!p.placa?.comercioId) return { texto: `🪧 La placa ${b(p.codigo)} está libre. Asígnala: /placa ${p.codigo} Bar Pepe` };
+      const l = [`🪧 Placa ${b(p.codigo)} → ${b(p.comercio ?? "(comercio borrado)")}`, `Escaneos: ${b(p.placa.escaneos)}${p.placa.ultimoEscaneoAt ? ` (el último el ${fechaCorta(p.placa.ultimoEscaneoAt.toISOString().slice(0, 10))})` : ""}`];
+      l.push(p.resenasUrl ? `Lleva a: ${html(p.resenasUrl)}` : `⚠️ El comercio aún no tiene enlace de reseñas: /dato ${html(p.comercio ?? "")} | resenas | https://g.page/r/…/review`);
+      return { texto: l.join("\n") };
+    }
+    case "placas": {
+      const ps = await listarPlacas(db);
+      if (!ps.length) return { texto: `Aún no hay placas asignadas. ${USO_PLACA}` };
+      const total = ps.reduce((x, p) => x + p.escaneos, 0);
+      return {
+        texto: [
+          b(`Placas asignadas (${ps.length}) · ${plural(total, "escaneo", "escaneos")}`),
+          ...ps.slice(0, 60).map((p) => `${p.resenasUrl ? "🪧" : "⚠️"} ${p.codigo} ${html(p.comercio)}: ${p.escaneos}`),
+          ...(ps.some((p) => !p.resenasUrl) ? ["", "⚠️ = el comercio aún no tiene enlace de reseñas (/dato … | resenas | …)."] : []),
+        ].join("\n"),
+      };
+    }
+
     // ── Escrituras ──
+    case "asignarPlaca": {
+      // Antes de nada (p. ej. de proponer crear el comercio), que el código sea bueno
+      if (!normalizarCodigo(a.codigo)) await infoPlaca(db, a.codigo);
+      const c = await comercioDe(ctx, a, true);
+      if (esRespuesta(c)) return c;
+      const r = await asignarPlaca(db, a.codigo, c.id, socio.id, ctx.origen);
+      const l = [`🪧 Placa ${b(r.placa.codigo)} asignada a ${b(c.nombre)}${r.antes ? ` (antes era de ${html(r.antes.nombre)})` : ""}.`];
+      l.push(c.resenasUrl ? "Ya lleva a sus reseñas: escanéala para probarla." : `Falta su enlace de reseñas: /dato ${html(c.nombre)} | resenas | https://g.page/r/…/review`);
+      return { texto: l.join("\n") };
+    }
+    case "quitarPlaca": {
+      const r = await quitarPlaca(db, a.codigo, socio.id, ctx.origen);
+      return { texto: `🪧 Placa ${b(r.codigo)} quitada${r.comercio ? ` de ${b(r.comercio.nombre)}` : ""}: ya no lleva a ningún sitio. Se puede volver a asignar.` };
+    }
     case "nuevo": {
       const c = await crearComercio(db, { nombre: a.nombre, tipo: a.tipo, zona: a.zona, contacto: a.contacto, direccion: a.direccion }, socio.id, ctx.origen);
       return { texto: `➕ Apuntado ${b(c.nombre)}. Cuando lo visites: /visita ${html(c.nombre)} si|no|luego` };

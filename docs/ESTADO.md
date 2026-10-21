@@ -34,6 +34,26 @@ Hecho todo el plan (F0–F6):
 - Cloudflare: rutas `nfc`, `paquito` y `demo-paquito` creadas con el MCP de Cloudflare (acceso completo; preguntar antes de algo de pago).
 - Tests: core 26, bot 25, api 12, e2e 9.
 
+## v0.4.0 (2026-10-21)
+### Mensajes que se borran solos
+- Tabla `efimeros` (migración 0003): el bot programa el borrado de sus mensajes de un momento y los borra cada 10 s
+  (Telegram solo deja borrar < 48 h). `/panel`: mensaje más explicativo, se borra a los 15 min y el nuevo borra el anterior
+  (clave `panel:<socio>`). Preguntas Confirmar/Cancelar: se borran al contestar (cancelar = solo toast) o a los 30 min.
+  Errores: 5 min. Avisos breves del grupo: 1 min. «Hoy te toca»: el de cada día borra el anterior (clave `dia:<socio>`).
+  «Hecho» de un recordatorio quita ese botón en vez de mandar mensaje.
+
+### Placas con código
+- Cada placa impresa lleva un código de 5 caracteres (4 al azar + 1 de control, alfabeto sin 0/O/1/I/L) en el QR y la
+  pegatina NFC: `/r/<código>` (también `/R/`, el QR va en mayúsculas para salir más pequeño). Redirige (302, sin caché)
+  al enlace de reseñas del comercio asignado y cuenta el escaneo. Sin asignar o sin enlace: página «aún no activada».
+  Límite: 60 escaneos/min por IP. Los códigos nunca asignados no crean filas.
+- Tabla `placas` (fila al asignar) y `comercios.resenasUrl` (migración 0002_placas).
+- Bot: `/placa K7M2Q Bar Pepe` (asigna; propone crear el comercio), `/placa K7M2Q` (info), `/placa K7M2Q quitar`, `/placas`,
+  `/dato Bar Pepe | resenas | https://…`. La ficha muestra placas y escaneos. Se puede deshacer.
+- Lotes en el Mac: `hardware/soporte-nfc/generar_lote.py N` (STL de placa con su QR + tapa con el código grabado + lote.csv
+  con la URL de cada pegatina NFC). El carácter de control está duplicado en Python y en `servicios/placas.ts`.
+- Falta: verlo en el panel web (la API de la ficha ya devuelve `placas`).
+
 ## Pendiente (lo tiene que hacer el usuario)
 1. Crear el bot en @BotFather y poner `BOT_TOKEN` en el VPS (ver OPERACIONES). Desactivar *privacy mode* (`/setprivacy` → Disable)
    para que entienda frases en el grupo cuando le mencionan.

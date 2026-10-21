@@ -103,6 +103,8 @@ export const comercios = pgTable(
     direccion: text(),
     contacto: text(),
     mapsUrl: text(),
+    /** Enlace para dejar reseña en Google (al que redirigen sus placas). */
+    resenasUrl: text(),
     nota: text(),
     lat: real(),
     lon: real(),
@@ -115,6 +117,25 @@ export const comercios = pgTable(
     anuladoAt: anulado(),
   },
   (t) => [index("comercios_nombre_norm").on(t.nombreNorm), index("comercios_estado").on(t.estado)],
+);
+
+/**
+ * Placas impresas. Cada una lleva un código (en el QR y en la pegatina NFC: `/r/<código>`) que redirige al enlace de
+ * reseñas del comercio al que esté asignada. Se imprimen en lotes sin saber para quién son: la fila se crea al asignarla.
+ */
+export const placas = pgTable(
+  "placas",
+  {
+    id: integer().primaryKey().generatedAlwaysAsIdentity(),
+    codigo: text().notNull().unique(),
+    comercioId: integer().references(() => comercios.id),
+    asignadaPor: integer().references(() => socios.id),
+    asignadaAt: timestamp({ withTimezone: true }),
+    escaneos: integer().notNull().default(0),
+    ultimoEscaneoAt: timestamp({ withTimezone: true }),
+    creadoAt: creado(),
+  },
+  (t) => [index("placas_comercio").on(t.comercioId)],
 );
 
 export const resultadoVisita = pgEnum("resultado_visita", ["si", "no", "luego", "interesado"]);
@@ -312,3 +333,21 @@ export const usoIa = pgTable("uso_ia", {
   fecha: date().primaryKey(),
   peticiones: integer().notNull().default(0),
 });
+
+/**
+ * Mensajes del bot que se borran solos (enlaces del panel, errores, preguntas ya contestadas, el recordatorio de ayer…).
+ * `clave`: al programar otro mensaje con la misma clave, los anteriores se borran ya (p. ej. «panel:3»).
+ * Telegram solo deja borrar mensajes de menos de 48 h: `borrarAt` nunca pasa de ese plazo.
+ */
+export const efimeros = pgTable(
+  "efimeros",
+  {
+    id: integer().primaryKey().generatedAlwaysAsIdentity(),
+    chatId: bigint({ mode: "number" }).notNull(),
+    messageId: integer().notNull(),
+    clave: text(),
+    borrarAt: timestamp({ withTimezone: true }).notNull(),
+    creadoAt: creado(),
+  },
+  (t) => [index("efimeros_borrar").on(t.borrarAt), index("efimeros_clave").on(t.clave)],
+);
