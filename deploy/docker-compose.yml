@@ -77,7 +77,9 @@ services:
     logging: { driver: json-file, options: { max-size: "10m", max-file: "3" } }
     networks: [internal]
 
-  # Copia diaria con pg_dump (30 días) en ./backups; tools/pull-backups.sh la trae al Mac.
+  # Copia diaria a las 4:00 (Madrid) con pg_dump, 30 días en ./backups, y simulacro de restauración justo después:
+  # la copia se restaura en una BD aparte (nfc_simulacro) y se comprueba que tiene todas las tablas. Resultado en
+  # ./backups/simulacro.txt. Al arrancar, si falta la copia de hoy, la hace en el momento.
   backup:
     image: postgres:17-alpine
     container_name: nfc-backup
@@ -85,15 +87,34 @@ services:
     user: "0:0"
     environment:
       PGPASSWORD: ${POSTGRES_PASSWORD}
+      PGHOST: db
+      PGUSER: nfc
+      TZ: Europe/Madrid
     volumes: [./backups:/backups]
     entrypoint: ["/bin/sh", "-c"]
     command:
       - |
-        while true; do
+        copia() {
           f=/backups/nfc-$$(date +%F).sql.gz
-          pg_dump -h db -U nfc -d nfc --no-owner | gzip > $$f.tmp && mv $$f.tmp $$f && echo "backup ok $$f"
+          pg_dump -d nfc --no-owner | gzip > $$f.tmp && mv $$f.tmp $$f || { echo "$$(date '+%F %T') FALLO: pg_dump" | tee /backups/simulacro.txt; return 1; }
           find /backups -name 'nfc-*.sql.gz' -mtime +30 -delete
-          sleep 86400
+          find /backups -name 'pre-*.sql.gz' -mtime +90 -delete
+          psql -q -d postgres -c 'drop database if exists nfc_simulacro' -c 'create database nfc_simulacro' >/dev/null
+          if gunzip -c $$f | psql -q -v ON_ERROR_STOP=1 -d nfc_simulacro >/dev/null 2>/tmp/err; then
+            t=$$(psql -tA -d nfc_simulacro -c "select count(*) from information_schema.tables where table_schema = 'public'")
+            m=$$(psql -tA -d nfc_simulacro -c "select count(*) from drizzle.__drizzle_migrations")
+            v=$$(psql -tA -d nfc_simulacro -c "select (select count(*) from ventas) || ' ventas, ' || (select count(*) from comercios) || ' comercios, ' || (select count(*) from movimientos) || ' movimientos'")
+            if [ "$$t" -ge 15 ]; then r="OK: $$f restaurada ($$t tablas, $$m migraciones, $$v)"; else r="FALLO: $$f solo tiene $$t tablas"; fi
+          else
+            r="FALLO: $$f no se restaura: $$(head -c 300 /tmp/err)"
+          fi
+          psql -q -d postgres -c 'drop database if exists nfc_simulacro' >/dev/null
+          echo "$$(date '+%F %T') $$r" | tee /backups/simulacro.txt
+        }
+        [ -f /backups/nfc-$$(date +%F).sql.gz ] || copia
+        while true; do
+          sleep 600
+          [ "$$(date +%H)" = "04" ] && [ ! -f /backups/nfc-$$(date +%F).sql.gz ] && copia
         done
     depends_on:
       db: { condition: service_healthy }

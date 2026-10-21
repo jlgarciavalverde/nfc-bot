@@ -18,6 +18,7 @@ Hecho todo el plan (F0–F6):
   «Abrir chat privado» + chuleta de comandos. Al aprobar: chuleta en el grupo y guía completa por privado.
   `/config bienvenida …` (admin) cambia el texto (`{nombre}`). `/start` de alguien que aún no es socio le explica cómo entrar.
 - IA: si Gemini está saturado, prueba el siguiente modelo (`GEMINI_MODELS`, por defecto flash → flash-lite) (v0.1.1).
+- Copias en el VPS a las 4:00 con simulacro de restauración diario (`backups/simulacro.txt`).
 - Producción: bot con token y Gemini, admin «Cheluisss» dado de alta, grupo «Billetes» vinculado.
 
 ## Pendiente (lo tiene que hacer el usuario)
@@ -27,7 +28,7 @@ Hecho todo el plan (F0–F6):
 3. Clave de Gemini (opcional) en `GEMINI_API_KEY`.
 4. `/start <SETUP_CODE>` por privado al bot, añadirlo al grupo, `/vincular`, que los demás hagan `/unirme`.
 5. Meter precios reales: `/producto nuevo Panel NFC 25€`, tramos y ofertas.
-6. `tools/install-launchd.sh` en el Mac para traer las copias.
+6. (Opcional) `tools/install-launchd.sh` en el Mac para tener las copias también fuera del VPS. Por decisión del usuario, de momento solo en el VPS.
 
 ## Ideas para después
 - Facturas/tickets PDF para el comercio. Mensaje de seguimiento a clientes (¿cuántas reseñas han conseguido?).

@@ -15,8 +15,9 @@
 - Desplegar: `node tools/deploy.mjs X.Y.Z` (tests, imagen amd64, copia previa de la BD, arranque, `/health`; vuelve atrás si falla).
 - Logs: `ssh joseluis@192.168.18.7 'docker logs nfc-bot --tail 50'` (o `nfc-web`).
 - Salud del bot: `docker exec nfc-bot node -e "fetch('http://127.0.0.1:3001').then(r=>r.text()).then(console.log)"`.
-- Copias: `~/servicios/nfc/backups/` (diarias + `pre-X.Y.Z` en cada despliegue). En el Mac: `tools/install-launchd.sh` una vez;
-  resultado del simulacro en `~/Backups/nfc-bot/simulacro.txt`.
+- Copias: `~/servicios/nfc/backups/` en el VPS: diaria a las 4:00 (30 días) + `pre-X.Y.Z` en cada despliegue (90 días).
+  Tras cada copia diaria, `nfc-backup` la restaura en una BD aparte y deja el resultado en `backups/simulacro.txt`
+  (`cat ~/servicios/nfc/backups/simulacro.txt`). Opcional, copia fuera del VPS: `tools/install-launchd.sh` en el Mac.
 - Restaurar: `gunzip -c copia.sql.gz | docker exec -i nfc-db psql -U nfc -d nfc` sobre una BD vacía.
 
 ## Si algo falla
