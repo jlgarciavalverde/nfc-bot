@@ -2,6 +2,7 @@ import { and, desc, eq, gte, isNull, lte, sql } from "drizzle-orm";
 import type { DB, Tx } from "../db/client";
 import { lotes, movimientos, productos, socios, ventas } from "../db/schema";
 import { hoy as hoyMadrid } from "../fechas";
+import { euros } from "../texto";
 import type { Producto } from "./catalogo";
 import { ErrorNegocio } from "./errores";
 import { registrarOperacion } from "./operaciones";
@@ -30,7 +31,7 @@ export async function apuntarMovimiento(
     .values({ tipo: m.tipo, importeCent: m.importeCent, socioId: m.socioId, categoria: m.categoria ?? null, nota: m.nota ?? null, fecha: m.fecha ?? hoyMadrid() })
     .returning();
   const nombre = m.tipo === "ingreso" ? "Ingreso" : RESUMEN[m.tipo];
-  await registrarOperacion(db, { socioId: porSocioId, tipo: m.tipo, resumen: `${nombre} de ${m.importeCent} cent${m.nota ? ` (${m.nota})` : ""}`, deshacer: { t: "movimiento", movimientoId: r!.id }, origen });
+  await registrarOperacion(db, { socioId: porSocioId, tipo: m.tipo, resumen: `${nombre} de ${euros(m.importeCent)}${m.categoria ? ` (${m.categoria})` : ""}${m.nota && m.nota !== m.categoria ? `: ${m.nota}` : ""}`, deshacer: { t: "movimiento", movimientoId: r!.id }, origen });
   return r!;
 }
 
@@ -45,7 +46,7 @@ export async function comprarLote(db: DB, d: { producto: Producto; uds: number; 
       .insert(movimientos)
       .values({ tipo: "gasto", importeCent: d.costeCent, fecha, socioId, categoria: "stock", loteId: l!.id, nota: `${d.uds} × ${d.producto.nombre}${d.proveedor ? ` (${d.proveedor})` : ""}` })
       .returning();
-    await registrarOperacion(tx, { socioId, tipo: "compra", resumen: `Compra de ${d.uds} ${d.producto.nombre}`, deshacer: { t: "lote", loteId: l!.id, movimientoId: m!.id }, origen });
+    await registrarOperacion(tx, { socioId, tipo: "compra", resumen: `Compra de ${d.uds} ${d.producto.nombre} por ${euros(d.costeCent)}`, deshacer: { t: "lote", loteId: l!.id, movimientoId: m!.id }, origen });
     return l!;
   });
 }

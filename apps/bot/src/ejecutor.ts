@@ -1,6 +1,6 @@
 import { and, eq, gt, isNull, sql } from "drizzle-orm";
 import {
-  altaSocio, apuntarMovimiento, buscarComercio, cambiarDatoComercio, cambiarPrecio, cambiarSocio, comercioPorId, comprarLote,
+  altaSocio, apuntarMovimiento, avisar, TIPOS_AVISO, buscarComercio, cambiarDatoComercio, cambiarPrecio, cambiarSocio, comercioPorId, comprarLote,
   crearComercio, crearOferta, crearProducto, crearRecordatorio, describirOferta, embudo, ErrorNegocio, ESTADOS, estadoStock, euros,
   fechaCorta, fichaComercio, guardarAjuste, guardarTramo, borrarTramo, html, leerAjustes, listarComercios, listarMovimientos,
   listarProductos, listarSocios, listarVentas, marcarCobrada, ofertasDe, parsePorcentaje, pct, plural, ponerUbicacion,
@@ -307,13 +307,13 @@ export async function ejecutar(ctx: Contexto, entrada: Accion): Promise<Respuest
       const l = [`⭐ Venta ${b(`#${v.id}`)} a ${b(c.nombre)}: ${plural(v.uds, producto.nombre, producto.nombre)} por ${b(euros(v.totalCent))}`, html(v.aplicado)];
       l.push(v.cobrada ? `✅ Cobrada${v.metodo ? ` por ${v.metodo}` : ""}` : `⏳ Pendiente de cobro. Cuando paguen: /cobrado ${v.id} bizum`);
       if (v.costeCent != null) l.push(`Margen: ${euros(v.totalCent - v.costeCent)}`);
-      let grupo: string | undefined;
+      // El aviso de stock bajo va al grupo por el buzón de avisos (se puede silenciar con /config avisos stock no)
       if (v.costeCent != null) {
         const { stockMin } = await leerAjustes(db);
         const s = (await estadoStock(db)).find((x) => x.productoId === producto.id);
-        if (s && s.uds < stockMin) grupo = `⚠️ Quedan ${b(plural(s.uds, "panel", "paneles"))} de ${html(producto.nombre)}. Toca pedir más.`;
+        if (s && s.uds < stockMin) await avisar(db, { tipo: "stock", texto: `⚠️ Quedan ${b(plural(s.uds, "panel", "paneles"))} de ${html(producto.nombre)}. Toca pedir más.` });
       }
-      return { texto: l.join("\n"), grupo };
+      return { texto: l.join("\n") };
     }
     case "cobrado": {
       const r = await marcarCobrada(db, a.ventaId, a.metodo ?? null, socio.id, ctx.origen);
@@ -435,6 +435,20 @@ async function configurar(ctx: Contexto, a: Extract<Accion, { t: "config" }>): P
       const p = await resolverProducto(db, v);
       await guardarAjuste(db, "productoDefectoId", p.id);
       return { texto: `Producto por defecto: ${b(p.nombre)}.` };
+    }
+    case "avisos": {
+      const [tipo, valor] = v.toLowerCase().split(/\s+/);
+      const tipos = Object.keys(TIPOS_AVISO) as (keyof typeof TIPOS_AVISO)[];
+      let { avisosSilenciados: sil } = await leerAjustes(db);
+      if (tipo) {
+        const t = tipos.find((x) => x === tipo);
+        if (!t || !["si", "sí", "no"].includes(valor ?? "")) throw new ErrorNegocio(`Así: /config avisos ${tipos.join("|")} si|no`);
+        sil = valor === "no" ? [...new Set([...sil, t])] : sil.filter((x) => x !== t);
+        await guardarAjuste(db, "avisosSilenciados", sil);
+      }
+      return {
+        texto: [b("Avisos automáticos"), ...tipos.map((t) => `${sil.includes(t) ? "🔕" : "🔔"} ${t}: ${TIPOS_AVISO[t]}`), "", "Cambiar: /config avisos copia no (o si)"].join("\n"),
+      };
     }
     case "bienvenida": {
       const t = a.valor.trim();

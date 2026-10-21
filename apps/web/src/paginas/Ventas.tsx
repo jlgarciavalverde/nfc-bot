@@ -4,6 +4,7 @@ import { api } from "../lib/api";
 import { euros, fecha } from "../lib/formato";
 import type { Venta } from "../lib/tipos";
 import { Cifra, Datos, Filtro, Tabla, Titulo, Vacio } from "../componentes/ui";
+import { CobrarVenta } from "../componentes/AccionesRapidas";
 
 export function Ventas() {
   const q = useQuery({ queryKey: ["ventas"], queryFn: () => api.get<{ ventas: Venta[] }>("/api/ventas").then((r) => r.ventas) });
@@ -41,7 +42,7 @@ export function Ventas() {
                       <td className="text-right font-medium">{euros(v.totalCent)}</td>
                       <td className="text-right">{v.costeCent == null ? "—" : euros(v.totalCent - v.costeCent)}</td>
                       <td className="min-w-40 text-tinta-2">{v.aplicado}</td>
-                      <td className="whitespace-nowrap">{v.cobrada ? (v.metodo ?? "cobrada") : <span className="font-medium text-sale">pendiente</span>}</td>
+                      <td className="whitespace-nowrap">{v.cobrada ? (v.metodo ?? "cobrada") : <CobrarVenta id={v.id} totalCent={v.totalCent} comercio={v.comercio} />}</td>
                     </tr>
                   ))}
                 </tbody>

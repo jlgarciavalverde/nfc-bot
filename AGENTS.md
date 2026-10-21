@@ -47,4 +47,7 @@ Desarrollo: `cp deploy/.env.example .env` (BOT_TOKEN de un bot de pruebas, `AI_F
   acabar refiriéndose a la tabla de dentro. Mejor consultas agrupadas por separado (ver `resumen.ts`).
 - `@fastify/static` con `wildcard: false` registra los archivos al arrancar: tras recompilar la web, reinicia la API.
 - `pnpm test` va en serie (`--workspace-concurrency=1`): core, bot y api comparten la BD `nfc_test`.
+- Avisos: nunca enviar a Telegram desde la API ni desde scripts: dejar el mensaje en `avisos` (`avisar()` o un `insert`)
+  y lo envía el bot. Texto en HTML de Telegram (escapar con `html()`).
+- El contenedor `nfc-backup` y `tools/deploy.mjs` escriben en `avisos` por SQL: si cambia esa tabla, revisarlos.
 - La carpeta `hardware/` (soporte 3D en OpenSCAD) es de otro trabajo: no forma parte de la app.

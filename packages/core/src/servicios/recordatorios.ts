@@ -46,7 +46,7 @@ export async function marcarHecho(db: Tx, id: number, socioId: number) {
     .where(and(eq(recordatorios.id, id), isNull(recordatorios.hechoAt), isNull(recordatorios.anuladoAt)))
     .returning();
   if (!r.length) throw new ErrorNegocio("Ese recordatorio ya estaba hecho.");
-  await registrarOperacion(db, { socioId, tipo: "recordatorio_hecho", resumen: `Recordatorio ${id} hecho` });
+  await registrarOperacion(db, { socioId, tipo: "recordatorio_hecho", resumen: `Recordatorio hecho` });
   return r[0]!;
 }
 

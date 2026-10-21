@@ -2,6 +2,7 @@ import { and, asc, desc, eq, gt, isNull, sql } from "drizzle-orm";
 import type { DB, Tx } from "../db/client";
 import { comercios, consumos, lotes, movimientos, productos, socios, ventas } from "../db/schema";
 import { hoy as hoyMadrid } from "../fechas";
+import { euros } from "../texto";
 import { comercioPorId } from "./comercios";
 import { llevaStock, presupuesto, type Producto } from "./catalogo";
 import { ErrorNegocio } from "./errores";
@@ -84,7 +85,7 @@ export async function registrarVenta(db: DB, v: NuevaVenta, socioId: number, ori
     await registrarOperacion(tx, {
       socioId,
       tipo: "venta",
-      resumen: `Venta #${venta!.id} a ${c.nombre}: ${v.uds} uds`,
+      resumen: `Venta #${venta!.id} a ${c.nombre}: ${v.uds} ${v.uds === 1 ? "ud" : "uds"} por ${euros(totalCent)}`,
       deshacer: { t: "venta", ventaId: venta!.id, comercioId: c.id, estadoPrevio: c.estado, responsablePrevio: c.responsableId },
       origen,
     });
@@ -109,7 +110,7 @@ export async function marcarCobrada(db: DB, ventaId: number, metodo: MetodoPago 
       .insert(movimientos)
       .values({ tipo: "ingreso", importeCent: v.totalCent, fecha: hoyMadrid(), socioId, categoria: "venta", ventaId: v.id, nota: `${c?.nombre} (${v.uds} uds)` })
       .returning();
-    await registrarOperacion(tx, { socioId, tipo: "cobro", resumen: `Cobrada la venta #${v.id}`, deshacer: { t: "cobro", ventaId: v.id, movimientoId: m!.id }, origen });
+    await registrarOperacion(tx, { socioId, tipo: "cobro", resumen: `Cobrada la venta #${v.id} de ${c?.nombre ?? ""} (${euros(v.totalCent)})`, deshacer: { t: "cobro", ventaId: v.id, movimientoId: m!.id }, origen });
     return { venta: { ...v, cobrada: true }, comercio: c?.nombre ?? "" };
   });
 }

@@ -53,7 +53,7 @@ const TEMAS: Record<string, { titulo: string; lineas: string[]; admin?: boolean 
   },
   socios: {
     titulo: "🤝 Socios y reparto",
-    lineas: ["/reparto — lo que le tocaría a cada uno", "/socios", "/panel — enlace al panel web (te llega por privado)", "/deshacer — anula lo último que apuntaste (10 min)"],
+    lineas: ["/reparto — lo que le tocaría a cada uno", "/socios", "/panel — enlace y código para el panel web (te llega por privado) · /panel cerrar — cierra tus sesiones", "/deshacer — anula lo último que apuntaste (10 min)"],
   },
   admin: {
     titulo: "👑 Admin",
@@ -65,6 +65,7 @@ const TEMAS: Record<string, { titulo: string; lineas: string[]; admin?: boolean 
       "/config reparto igual|porcentaje|aportado · /config comision 10% · /config porcentaje Ana 50%",
       "/config stock 5 · /config admin Ana · /config socio Ana · /config baja Ana",
       "/config bienvenida ¡Hola, {nombre}! … — texto al entrar alguien al grupo (vacío = el de por defecto)",
+      "/config avisos — qué avisos automáticos se publican · /config avisos panel no",
       "/vincular — en el grupo, para que el bot trabaje ahí",
     ],
   },

@@ -1,6 +1,6 @@
-import { and, desc, eq, gt, inArray, isNull, ne } from "drizzle-orm";
+import { and, desc, eq, gt, inArray, isNull, ne, sql } from "drizzle-orm";
 import type { DB, Tx } from "../db/client";
-import { comercios, consumos, lotes, movimientos, operaciones, recordatorios, ventas, visitas } from "../db/schema";
+import { comercios, consumos, lotes, movimientos, operaciones, recordatorios, socios, ventas, visitas } from "../db/schema";
 import { ErrorNegocio } from "./errores";
 
 type EstadoComercio = (typeof comercios.$inferSelect)["estado"];
@@ -79,4 +79,19 @@ export async function deshacerUltima(db: DB, socioId: number, now = new Date()) 
     await registrarOperacion(tx, { socioId, tipo: "deshacer", resumen: `Deshecho: ${op.resumen}` });
     return op.resumen;
   });
+}
+
+/** Últimas operaciones (para la actividad del panel). `deshacible`: es tuya, de los últimos 10 minutos y se puede deshacer. */
+export async function actividadReciente(db: Tx, socioId: number, limite = 40) {
+  const filas = await db
+    .select({ id: operaciones.id, tipo: operaciones.tipo, resumen: operaciones.resumen, origen: operaciones.origen, creadoAt: operaciones.creadoAt, deshechaAt: operaciones.deshechaAt, socioId: operaciones.socioId, socio: socios.nombre, tieneDeshacer: sql<boolean>`${operaciones.deshacer} is not null` })
+    .from(operaciones)
+    .leftJoin(socios, eq(socios.id, operaciones.socioId))
+    .where(ne(operaciones.tipo, "deshacer"))
+    .orderBy(desc(operaciones.id))
+    .limit(limite);
+  const limiteMs = Date.now() - MINUTOS_DESHACER * 60_000;
+  // Solo la última operación propia sin deshacer es deshacible (deshacerUltima va siempre a por la última)
+  const ultimaPropia = filas.find((f) => f.socioId === socioId && !f.deshechaAt);
+  return filas.map(({ tieneDeshacer, ...f }) => ({ ...f, deshacible: f.id === ultimaPropia?.id && tieneDeshacer && f.creadoAt.getTime() > limiteMs }));
 }

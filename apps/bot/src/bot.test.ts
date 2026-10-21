@@ -1,11 +1,12 @@
 import { afterAll, beforeAll, beforeEach, describe, expect, it } from "vitest";
 import type { Update } from "grammy/types";
-import { estadoStock, leerAjustes, resumenCaja, tablas, type DB } from "@nfc/core";
+import { avisar, estadoStock, leerAjustes, resumenCaja, tablas, type DB } from "@nfc/core";
 import { bdDeTest, vaciar } from "@nfc/core/testing";
 import { crearBot } from "./bot";
 import { configFromEnv } from "./config";
 import { crearFake } from "./ia/fake";
-import { tick } from "./programador";
+import { enviarAvisos, tick } from "./programador";
+import { eq } from "drizzle-orm";
 
 let db: DB;
 let cerrar: () => Promise<void>;
@@ -146,7 +147,10 @@ describe("flujo de negocio", () => {
     r = await escribir(BEA, GRUPO, "/venta bar pepe 2 pagado bizum");
     expect(textos(r)[0]).toContain("Venta <b>#1</b>");
     expect(textos(r)[0]).toContain("50,00 €");
-    expect(textos(r).some((t) => t.includes("Quedan <b>8 paneles</b>"))).toBe(true);
+    // El aviso de stock bajo va al grupo por el buzón
+    const salida: { chat_id: number; text: string }[] = [];
+    await enviarAvisos(db, { sendMessage: async (chat_id: number, text: string) => (salida.push({ chat_id, text }), {} as never) } as never);
+    expect(salida).toEqual([{ chat_id: GRUPO, text: expect.stringContaining("Quedan <b>8 paneles</b>") }]);
     expect((await estadoStock(db))[0]!.uds).toBe(8);
     expect(textos(await escribir(ANA, GRUPO, "/caja"))[0]).toContain("Beneficio: <b>0,00 €</b>");
 
@@ -205,12 +209,67 @@ describe("flujo de negocio", () => {
   it("panel: enlace por privado", async () => {
     await montar();
     const r = await escribir(BEA, GRUPO, "/panel");
-    expect(r.find((l) => l.payload.chat_id === BEA)?.payload.text).toMatch(/\/entrar#[\w-]{40,}/);
+    const dm = r.find((l) => l.payload.chat_id === BEA)?.payload.text as string;
+    expect(dm).toMatch(/\/entrar#[\w-]{40,}/);
+    expect(dm).toMatch(/<code>\d{4} \d{4}<\/code>/);
     expect(textos(r)).toContain("Te lo he mandado por privado. 📬");
+    expect(await db.select().from(tablas.enlacesPanel)).toHaveLength(1);
+    expect(textos(await escribir(BEA, BEA, "/panel cerrar"))[0]).toContain("No tenías ninguna sesión");
+  });
+  it("/config avisos: lista y silencia tipos (solo admin)", async () => {
+    await montar();
+    expect(textos(await escribir(ANA, GRUPO, "/config avisos"))[0]).toContain("🔔 panel");
+    expect(textos(await escribir(ANA, GRUPO, "/config avisos panel no"))[0]).toContain("🔕 panel");
+    expect((await leerAjustes(db)).avisosSilenciados).toEqual(["panel"]);
+    expect(textos(await escribir(ANA, GRUPO, "/config avisos panel si"))[0]).toContain("🔔 panel");
+    expect(textos(await escribir(ANA, GRUPO, "/config avisos nada no"))[0]).toContain("Así:");
+    expect(textos(await escribir(BEA, GRUPO, "/config avisos panel no"))[0]).toContain("solo lo puede hacer un admin");
+  });
+});
+
+describe("buzón de avisos", () => {
+  it("envía al grupo, a los admins y a un socio; un silencioso no se envía; si falla, reintenta hasta 5 veces", async () => {
+    await montar();
+    const [bea] = await db.select().from(tablas.socios).where(eq(tablas.socios.telegramId, BEA));
+    await avisar(db, { tipo: "panel", texto: "al grupo" });
+    await avisar(db, { tipo: "copia", texto: "a los admins", destino: "admins" });
+    await avisar(db, { tipo: "cobro", texto: "a Bea", destino: "socio", socioId: bea!.id });
+    await avisar(db, { tipo: "copia", texto: "silencioso", silencioso: true });
+    const salida: [number, string][] = [];
+    const api = { sendMessage: async (c: number, t: string) => (salida.push([c, t]), {} as never) };
+    expect(await enviarAvisos(db, api as never)).toBe(3);
+    expect(salida).toEqual([[GRUPO, "al grupo"], [ANA, "a los admins"], [BEA, "a Bea"]]);
+    expect(await enviarAvisos(db, api as never)).toBe(0);
+    await avisar(db, { tipo: "panel", texto: "falla" });
+    const rota = { sendMessage: async () => { throw new Error("caído"); } };
+    for (let i = 0; i < 6; i++) await enviarAvisos(db, rota as never);
+    const [f] = await db.select().from(tablas.avisos).where(eq(tablas.avisos.texto, "falla"));
+    expect(f).toMatchObject({ intentos: 5, enviadoAt: null });
   });
 });
 
 describe("avisos programados", () => {
+  it("ofertas: aviso 3 días antes de terminar y al día siguiente de terminar", async () => {
+    await montar();
+    await escribir(ANA, GRUPO, "/oferta pack 2 35€ hasta 25/10");
+    const api = { sendMessage: async () => ({}) as never };
+    await tick(db, api as never, new Date("2026-10-22T08:00:00Z"));
+    await tick(db, api as never, new Date("2026-10-22T09:00:00Z"));
+    await tick(db, api as never, new Date("2026-10-26T08:00:00Z"));
+    const textosAvisos = (await db.select().from(tablas.avisos)).filter((a) => a.tipo === "oferta").map((a) => a.texto);
+    expect(textosAvisos).toEqual([expect.stringContaining("termina el 25 oct"), expect.stringContaining("Ha terminado la oferta")]);
+  });
+  it("ventas sin cobrar hace más de 7 días: se lo recuerda al vendedor por la mañana", async () => {
+    await montar();
+    await escribir(BEA, GRUPO, "/nuevo Bar Pepe");
+    await escribir(BEA, GRUPO, "/venta Bar Pepe 1 pendiente");
+    const salida: { chat_id: number; text: string }[] = [];
+    const api = { sendMessage: async (chat_id: number, text: string) => (salida.push({ chat_id, text }), {} as never) };
+    await tick(db, api as never, new Date("2026-10-27T08:00:00Z"));
+    expect(salida).toHaveLength(0);
+    await tick(db, api as never, new Date("2026-10-28T08:00:00Z"));
+    expect(salida).toEqual([{ chat_id: BEA, text: expect.stringContaining("#1 Bar Pepe: 25,00 € desde el 21 oct") }]);
+  });
   it("recordatorios del día por privado, una sola vez, y resumen del lunes en el grupo", async () => {
     await montar();
     await escribir(BEA, GRUPO, "/nuevo Bar Pepe");

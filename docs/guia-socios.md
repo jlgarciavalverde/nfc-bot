@@ -20,8 +20,10 @@ Todo se apunta en el grupo de Telegram (o por privado al bot). Si te equivocas: 
 **Hablarle normal**: «hemos vendido 3 paneles al Bar Pepe, pagado por bizum». En el grupo, menciónalo o respóndele.
 Siempre te pide confirmar antes de apuntar.
 
-**Panel web**: `/panel` y abre el enlace que te llega por privado (sirve una vez, 15 min). Allí están las gráficas, el mapa
-y el botón para descargar todo en Excel.
+**Panel web**: `/panel` y abre el enlace que te llega por privado. La sesión se queda abierta en ese móvil u ordenador.
+Para tenerlo como app: «Añadir a pantalla de inicio» y entra con el código de 8 cifras que te da `/panel`.
+Desde el panel también se apunta todo (botón «Apuntar»), se cobran ventas pendientes y se ve quién ha hecho qué.
+Lo que apuntes en el panel lo aviso en el grupo. ¿Móvil perdido? `/panel cerrar`.
 
 Cada mañana a las 9:00 el bot te escribe por privado a quién te toca volver (ábrele un chat privado y pulsa Iniciar).
 Los lunes publica en el grupo el resumen de la semana.

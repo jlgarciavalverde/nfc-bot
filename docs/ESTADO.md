@@ -10,7 +10,7 @@ Hecho todo el plan (F0–F6):
   y confirmación por botón.
 - **Panel** (`nfc.redgarverde.com`): resumen con gráficas, comercios + ficha, mapa, ventas, caja, stock, reparto,
   precios (edición para admin, calculadora) y Excel con 7 hojas.
-- **Tests**: core 26, bot 21, api 7, e2e 6.
+- **Tests** (v0.2): core 26, bot 21, api 7, e2e 6.
 - Copias: `nfc-backup` diario (30 días) + `tools/pull-backups.sh` y simulacro de restauración en el Mac (launchd).
 
 ## v0.2.0 (2026-10-21)
@@ -20,6 +20,19 @@ Hecho todo el plan (F0–F6):
 - IA: si Gemini está saturado, prueba el siguiente modelo (`GEMINI_MODELS`, por defecto flash → flash-lite) (v0.1.1).
 - Copias en el VPS a las 4:00 con simulacro de restauración diario (`backups/simulacro.txt`).
 - Producción: bot con token y Gemini, admin «Cheluisss» dado de alta, grupo «Billetes» vinculado.
+
+## v0.3.0 (2026-10-21)
+- **Buzón de avisos** (`avisos`): panel, copias (`nfc-backup` deja el resultado; si falla → admins), despliegues
+  (`tools/deploy.mjs` publica `docs/novedades.md`), ofertas que terminan (3 días antes y al día siguiente), stock bajo.
+  El bot lo envía cada 10 s. `/config avisos <tipo> si|no` silencia tipos. Cobros sin cobrar > 7 días → al vendedor a las 9:00.
+  Resumen de los lunes incluye el estado de la última copia.
+- **Sesión permanente**: 365 días renovados con el uso (como mucho una escritura al día). Código de 8 cifras en `/panel` para
+  entrar desde la app instalada (PWA: manifest + iconos). `/panel cerrar` y página «Cuenta» con sesiones y «cerrar en los demás».
+- **Panel para gestionar**: botón «Apuntar» (visita, venta, dinero, compra, comercio, recordatorio, con buscador y «Crear»),
+  cobrar ventas, marcar recordatorios hechos, editar datos del comercio, actividad reciente con «Deshacer». Todo lo que se
+  apunta en el panel avisa al grupo.
+- Cloudflare: rutas `nfc`, `paquito` y `demo-paquito` creadas con el MCP de Cloudflare (acceso completo; preguntar antes de algo de pago).
+- Tests: core 26, bot 25, api 12, e2e 9.
 
 ## Pendiente (lo tiene que hacer el usuario)
 1. Crear el bot en @BotFather y poner `BOT_TOKEN` en el VPS (ver OPERACIONES). Desactivar *privacy mode* (`/setprivacy` → Disable)

@@ -20,5 +20,6 @@ export const api = {
   get: <T>(url: string) => pedir<T>("GET", url),
   post: <T>(url: string, cuerpo: unknown = {}) => pedir<T>("POST", url, cuerpo),
   put: <T>(url: string, cuerpo: unknown) => pedir<T>("PUT", url, cuerpo),
+  patch: <T>(url: string, cuerpo: unknown) => pedir<T>("PATCH", url, cuerpo),
   del: <T>(url: string) => pedir<T>("DELETE", url),
 };

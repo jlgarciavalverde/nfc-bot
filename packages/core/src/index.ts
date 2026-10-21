@@ -16,3 +16,4 @@ export * from "./servicios/reparto";
 export * from "./servicios/recordatorios";
 export * from "./servicios/resumen";
 export * from "./servicios/panel";
+export * from "./servicios/avisos";

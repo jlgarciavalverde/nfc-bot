@@ -2,7 +2,7 @@ import { and, asc, eq, isNull, or, gte } from "drizzle-orm";
 import type { Tx } from "../db/client";
 import { lotes, ofertas, productos, tramos } from "../db/schema";
 import { calcularPrecio, type OfertaPrecio } from "../precios";
-import { normalizar } from "../texto";
+import { euros, normalizar, pct } from "../texto";
 import { hoy as hoyMadrid } from "../fechas";
 import { guardarAjuste, leerAjustes } from "./ajustes";
 import { ErrorNegocio } from "./errores";
@@ -44,13 +44,13 @@ export async function crearProducto(db: Tx, nombre: string, precioCent: number, 
     .onConflictDoUpdate({ target: productos.nombreNorm, set: { precioCent, activo: true } })
     .returning();
   if (!(await leerAjustes(db)).productoDefectoId) await guardarAjuste(db, "productoDefectoId", p!.id);
-  await registrarOperacion(db, { socioId, tipo: "producto", resumen: `Producto ${p!.nombre} a ${precioCent} cent` });
+  await registrarOperacion(db, { socioId, tipo: "producto", resumen: `Producto ${p!.nombre} a ${euros(precioCent)}/ud` });
   return p!;
 }
 
 export async function cambiarPrecio(db: Tx, productoId: number, precioCent: number, socioId: number) {
   const [p] = await db.update(productos).set({ precioCent }).where(eq(productos.id, productoId)).returning();
-  await registrarOperacion(db, { socioId, tipo: "producto", resumen: `Precio de ${p!.nombre} a ${precioCent} cent` });
+  await registrarOperacion(db, { socioId, tipo: "producto", resumen: `Precio de ${p!.nombre} a ${euros(precioCent)}/ud` });
   return p!;
 }
 
@@ -62,7 +62,7 @@ export async function guardarTramo(db: Tx, productoId: number, desdeUds: number,
   if (!Number.isInteger(desdeUds) || desdeUds < 2) throw new ErrorNegocio("Un tramo empieza como mínimo en 2 unidades.");
   const valores = { precioCent: "precioCent" in v ? v.precioCent : null, descuentoBp: "descuentoBp" in v ? v.descuentoBp : null };
   await db.insert(tramos).values({ productoId, desdeUds, ...valores }).onConflictDoUpdate({ target: [tramos.productoId, tramos.desdeUds], set: valores });
-  await registrarOperacion(db, { socioId, tipo: "tramo", resumen: `Tramo desde ${desdeUds} uds: ${JSON.stringify(valores)}` });
+  await registrarOperacion(db, { socioId, tipo: "tramo", resumen: `Tramo desde ${desdeUds} uds: ${valores.precioCent != null ? `${euros(valores.precioCent)}/ud` : `−${pct(valores.descuentoBp ?? 0)}`}` });
 }
 
 export async function borrarTramo(db: Tx, productoId: number, desdeUds: number, socioId: number) {

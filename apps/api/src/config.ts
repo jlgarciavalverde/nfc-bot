@@ -10,6 +10,8 @@ export interface ApiConfig {
   webDir?: string;
   logLevel?: string;
   port: number;
+  /** Intentos de entrada (enlace o código) por minuto y IP. */
+  loginRateLimit: number;
 }
 
 export function configFromEnv(env = process.env): ApiConfig {
@@ -23,5 +25,6 @@ export function configFromEnv(env = process.env): ApiConfig {
     webDir: env.WEB_DIR,
     logLevel: env.LOG_LEVEL,
     port: Number(env.PORT ?? 3000),
+    loginRateLimit: Number(env.LOGIN_RATE_LIMIT ?? 10),
   };
 }

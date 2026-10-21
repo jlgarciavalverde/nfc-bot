@@ -2,17 +2,12 @@ import { useState, type FormEvent } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { calcularPrecio } from "@nfc/core/precios";
 import { api } from "../lib/api";
-import { euros, fecha, pct } from "../lib/formato";
+import { aCent, euros, fecha, pct } from "../lib/formato";
 import type { Producto } from "../lib/tipos";
 import { useYo } from "../App";
 import { Boton, Campo, Datos, Selector, Seccion, Tabla, Titulo, Vacio } from "../componentes/ui";
 
 const hoy = () => new Date().toLocaleDateString("sv-SE", { timeZone: "Europe/Madrid" });
-/** «12,50» → 1250; null si no es un importe. */
-const aCent = (s: string) => {
-  const n = Number(s.replace(",", ".").replace(/\s*€$/, ""));
-  return Number.isFinite(n) && n > 0 ? Math.round(n * 100) : null;
-};
 
 export function Precios() {
   const q = useQuery({ queryKey: ["precios"], queryFn: () => api.get<{ productos: Producto[] }>("/api/precios").then((r) => r.productos) });

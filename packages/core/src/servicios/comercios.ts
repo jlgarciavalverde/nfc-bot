@@ -129,7 +129,7 @@ export async function registrarVisita(
   await registrarOperacion(db, {
     socioId,
     tipo: "visita",
-    resumen: `Visita a ${c.nombre}: ${d.resultado}`,
+    resumen: `Visita a ${c.nombre}: ${{ si: "sí", no: "no", luego: "volver", interesado: "interesado" }[d.resultado]}`,
     deshacer: { t: "visita", visitaId: v!.id, comercioId: c.id, estadoPrevio: c.estado, motivoPrevio: c.motivoNo, responsablePrevio: c.responsableId, recordatoriosCerrados: cerrados.map((r) => r.id) },
     origen,
   });

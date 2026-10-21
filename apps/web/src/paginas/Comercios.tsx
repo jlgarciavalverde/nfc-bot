@@ -3,7 +3,9 @@ import { useQuery } from "@tanstack/react-query";
 import { api } from "../lib/api";
 import { euros, fecha, normalizar } from "../lib/formato";
 import { ESTADOS, ORDEN_ESTADOS, type Comercio, type Estado, type Ficha } from "../lib/tipos";
-import { Campo, Datos, EtiquetaEstado, Filtro, Hoja, Tabla, Titulo, Vacio } from "../componentes/ui";
+import { Boton, Campo, Datos, EtiquetaEstado, Filtro, Hoja, Tabla, Titulo, Vacio } from "../componentes/ui";
+import { useApuntar } from "../componentes/Apuntar";
+import { useAccion } from "../lib/acciones";
 
 const RESULTADO = { si: "Sí", no: "No", luego: "Volver", interesado: "Interesado" } as const;
 
@@ -80,6 +82,7 @@ function FichaComercio({ id }: { id: number }) {
         const mapa = c.mapsUrl ?? (c.lat != null ? `https://www.google.com/maps?q=${c.lat},${c.lon}` : null);
         return (
           <div className="space-y-5 text-sm">
+            <AccionesFicha comercio={c} />
             <dl className="grid grid-cols-[8rem_minmax(0,1fr)] gap-y-1.5">
               <dt className="text-tinta-2">Estado</dt><dd><EtiquetaEstado estado={c.estado} /></dd>
               {[["Tipo", c.tipo], ["Zona", c.zona], ["Dirección", c.direccion], ["Contacto", c.contacto], ["Lo lleva", f.responsable], ["Motivo del no", c.estado === "no" ? c.motivoNo : null], ["Nota", c.nota]].map(
@@ -87,6 +90,7 @@ function FichaComercio({ id }: { id: number }) {
               )}
               {f.recordatorios.length > 0 && (<><dt className="text-tinta-2">Volver el</dt><dd>{f.recordatorios.map((r) => fecha(r.fecha, true)).join(", ")}</dd></>)}
             </dl>
+            <EditarDatos c={c} />
             {mapa && <a href={mapa} target="_blank" rel="noreferrer" className="inline-block underline underline-offset-2">Abrir en Google Maps</a>}
             <div>
               <h3 className="mb-1 font-semibold">Ventas</h3>
@@ -112,5 +116,48 @@ function FichaComercio({ id }: { id: number }) {
         );
       }}
     </Datos>
+  );
+}
+
+function AccionesFicha({ comercio }: { comercio: Comercio }) {
+  const abrir = useApuntar();
+  const c = { id: comercio.id, nombre: comercio.nombre };
+  return (
+    <div className="flex flex-wrap gap-2">
+      <Boton variante="primario" onClick={() => abrir({ tipo: "visita", comercio: c })}>Apuntar visita</Boton>
+      <Boton onClick={() => abrir({ tipo: "venta", comercio: c })}>Venta</Boton>
+      <Boton onClick={() => abrir({ tipo: "recordar", comercio: c })}>Recordar</Boton>
+    </div>
+  );
+}
+
+const CAMPOS = [["tipo", "Tipo"], ["zona", "Zona"], ["direccion", "Dirección"], ["contacto", "Contacto"], ["maps", "Enlace de Google Maps"], ["nota", "Nota"]] as const;
+
+function EditarDatos({ c }: { c: Comercio }) {
+  const inicial = { tipo: c.tipo ?? "", zona: c.zona ?? "", direccion: c.direccion ?? "", contacto: c.contacto ?? "", maps: c.mapsUrl ?? "", nota: c.nota ?? "" };
+  const [abierto, setAbierto] = useState(false);
+  const [d, setD] = useState(inicial);
+  const m = useAccion(() => {
+    const cambios = Object.fromEntries(Object.entries(d).filter(([k, v]) => v !== inicial[k as keyof typeof inicial]));
+    return api.patch(`/api/comercios/${c.id}`, cambios);
+  }, "Datos guardados");
+  if (!abierto) return <Boton variante="plano" className="-ml-3" onClick={() => setAbierto(true)}>Editar datos</Boton>;
+  return (
+    <form
+      aria-label="Editar datos del comercio"
+      className="space-y-3 rounded-md border border-regla p-3"
+      onSubmit={(e) => {
+        e.preventDefault();
+        m.mutate(undefined, { onSuccess: () => setAbierto(false) });
+      }}
+    >
+      {CAMPOS.map(([k, t]) => (
+        <Campo key={k} etiqueta={t} value={d[k]} onChange={(e) => setD({ ...d, [k]: e.target.value })} maxLength={500} />
+      ))}
+      <div className="flex gap-2">
+        <Boton type="submit" variante="primario" disabled={m.isPending}>Guardar cambios</Boton>
+        <Boton variante="plano" onClick={() => (setD(inicial), setAbierto(false))}>Cancelar</Boton>
+      </div>
+    </form>
   );
 }

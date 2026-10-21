@@ -22,7 +22,7 @@ export const USO: Record<string, string> = {
   tramo: "/tramo 5 20€   (desde 5 uds, 20 €/ud)   ·   /tramo 10 -25%   ·   /tramo borrar 5",
   oferta: "/oferta 3x2   ·   /oferta pack 5 99€   ·   /oferta -10% desde 20   ·   añade «hasta 31/12» si caduca   ·   /oferta quitar 3",
   config:
-    "/config reparto igual|porcentaje|aportado   ·   /config comision 10%   ·   /config porcentaje Ana 50%   ·   /config stock 5   ·   /config admin Ana   ·   /config socio Ana   ·   /config baja Ana   ·   /config producto Panel NFC   ·   /config bienvenida ¡Hola, {nombre}!",
+    "/config reparto igual|porcentaje|aportado   ·   /config comision 10%   ·   /config porcentaje Ana 50%   ·   /config stock 5   ·   /config admin Ana   ·   /config socio Ana   ·   /config baja Ana   ·   /config producto Panel NFC   ·   /config bienvenida ¡Hola, {nombre}!   ·   /config avisos   ·   /config avisos copia no",
   mes: "/mes   ·   /mes septiembre   ·   /mes 2026-09",
 };
 
@@ -298,9 +298,10 @@ export function parseComando(cmd: string, args: string, hoy: string): Accion | n
     case "config": {
       const [clave, ...resto] = palabras;
       const k = normalizar(clave ?? "") as Extract<Accion, { t: "config" }>["clave"];
-      if (!["reparto", "comision", "porcentaje", "stock", "admin", "socio", "baja", "producto", "bienvenida"].includes(k)) throw falta("config");
+      if (!["reparto", "comision", "porcentaje", "stock", "admin", "socio", "baja", "producto", "bienvenida", "avisos"].includes(k)) throw falta("config");
       // La bienvenida es texto libre (con saltos de línea); vacía = volver a la de por defecto
       if (k === "bienvenida") return { t: "config", clave: k, valor: a.replace(/^\S+\s*/, "") };
+      if (k === "avisos") return { t: "config", clave: k, valor: resto.join(" ") };
       if (k === "porcentaje") {
         const valor = resto.at(-1) ?? "";
         const socio = resto.slice(0, -1).join(" ");

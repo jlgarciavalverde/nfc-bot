@@ -2,7 +2,7 @@ import { Bot, GrammyError, InlineKeyboard, type Context } from "grammy";
 import type { InlineKeyboardButton, UserFromGetMe } from "grammy/types";
 import { and, eq, gt, isNull, sql } from "drizzle-orm";
 import {
-  altaSocio, crearEnlacePanel, deshacerUltima, ErrorNegocio, guardarAjuste, haySocios, hoy as hoyMadrid, html, leerAjustes,
+  altaSocio, cerrarSesionesDe, crearEnlacePanel, deshacerUltima, ErrorNegocio, guardarAjuste, haySocios, hoy as hoyMadrid, html, leerAjustes,
   listarProductos, marcarHecho, nombresComercios, recientesDeSocio, socioPorTelegram, tablas, MINUTOS_ENLACE, type DB, type Socio,
 } from "@nfc/core";
 import type { BotConfig } from "./config";
@@ -189,11 +189,23 @@ export function crearBot(deps: Deps, botInfo?: UserFromGetMe) {
   );
 
   bot.command("panel", async (ctx) => {
-    const token = await crearEnlacePanel(db, ctx.socio!.id);
+    if (/^cerrar/i.test(ctx.match.trim())) {
+      const n = await cerrarSesionesDe(db, ctx.socio!.id);
+      return ctx.reply(n ? `🔒 He cerrado ${n === 1 ? "tu sesión" : `tus ${n} sesiones`} del panel. Para volver a entrar: /panel` : "No tenías ninguna sesión abierta en el panel.");
+    }
+    const { token, codigo } = await crearEnlacePanel(db, ctx.socio!.id);
     const url = `${config.publicUrl}/entrar#${token}`;
-    const texto = `🔐 Tu enlace al panel (sirve una vez y caduca en ${MINUTOS_ENLACE} min):\n${url}\n\nNo lo reenvíes: quien lo abra entra como tú.`;
+    const texto = [
+      `🔐 <b>Entrar al panel</b> (sirve una vez y caduca en ${MINUTOS_ENLACE} min):`,
+      html(url),
+      "",
+      `Si lo tienes instalado como app, escribe este código: <code>${codigo.slice(0, 4)} ${codigo.slice(4)}</code>`,
+      "",
+      "La sesión se queda abierta en ese dispositivo (no hace falta volver a pedir enlace). No lo reenvíes: quien lo abra entra como tú.",
+      "¿Has perdido el móvil? /panel cerrar cierra todas tus sesiones.",
+    ].join("\n");
     try {
-      await ctx.api.sendMessage(ctx.from!.id, texto, { link_preview_options: { is_disabled: true } });
+      await ctx.api.sendMessage(ctx.from!.id, texto, { parse_mode: "HTML", link_preview_options: { is_disabled: true } });
       if (ctx.chat.type !== "private") await ctx.reply("Te lo he mandado por privado. 📬");
     } catch {
       await ctx.reply("No puedo escribirte por privado: ábreme un chat y pulsa Iniciar, y vuelve a pedir /panel.");

@@ -46,7 +46,7 @@ bot.api.config.use(async (prev, method, payload, signal) => {
   return r;
 });
 
-const timer = arrancarProgramador(db, bot.api);
+const pararProgramador = arrancarProgramador(db, bot.api);
 
 // Salud para Docker: BD accesible y Telegram respondiendo en los últimos 5 minutos (getUpdates hace long polling cada 30 s).
 const health = createServer(async (_req, res) => {
@@ -62,7 +62,7 @@ const health = createServer(async (_req, res) => {
 }).listen(3001, "127.0.0.1");
 
 const parar = async () => {
-  clearInterval(timer);
+  pararProgramador();
   health.close();
   await bot.stop();
   await conn.end();

@@ -3,7 +3,10 @@ import { api } from "../lib/api";
 import { euros, fecha, pct, plural } from "../lib/formato";
 import type { Resumen } from "../lib/tipos";
 import { BarraEmbudo, BarrasSemanas, LineaCaja } from "../componentes/graficos";
-import { Cifra, Datos, Seccion, Titulo, Vacio } from "../componentes/ui";
+import { Boton, Cifra, Datos, Seccion, Titulo, Vacio } from "../componentes/ui";
+import { Actividad, CobrarVenta, HechoRecordatorio } from "../componentes/AccionesRapidas";
+import { useApuntar } from "../componentes/Apuntar";
+import type { Venta } from "../lib/tipos";
 
 export function Inicio() {
   const q = useQuery({ queryKey: ["resumen"], queryFn: () => api.get<Resumen>("/api/resumen") });
@@ -11,7 +14,7 @@ export function Inicio() {
     <Datos q={q}>
       {(r) => (
         <>
-          <Titulo>Resumen</Titulo>
+          <Titulo accion={<AtajosApuntar />}>Resumen</Titulo>
           <div className="grid grid-cols-2 gap-x-6 gap-y-5 border-b border-regla pb-6 md:grid-cols-4">
             <Cifra etiqueta="Caja" valor={euros(r.caja.cajaCent)} nota="lo que debería haber" />
             <Cifra etiqueta="Beneficio" valor={euros(r.caja.beneficioCent)} tono={r.caja.beneficioCent < 0 ? "sale" : r.caja.beneficioCent > 0 ? "entra" : undefined} nota={`${euros(r.caja.ingresosCent)} de ingresos`} />
@@ -66,17 +69,27 @@ export function Inicio() {
                   {r.pendientes.map((p) => (
                     <li key={p.id} className="flex gap-3 py-2">
                       <span className={`num w-14 shrink-0 ${p.fecha <= r.hoy ? "font-semibold text-sale" : "text-tinta-2"}`}>{p.fecha < r.hoy ? "atrasado" : p.fecha === r.hoy ? "hoy" : fecha(p.fecha)}</span>
-                      <span className="min-w-0">
+                      <span className="min-w-0 flex-1">
                         <span className="font-medium">{p.comercio}</span>
                         <span className="text-tinta-2"> con {p.socio}</span>
                         {p.nota && <span className="block truncate text-tinta-3">{p.nota}</span>}
                       </span>
+                      {p.fecha <= r.hoy && <HechoRecordatorio id={p.id} comercio={p.comercio} />}
                     </li>
                   ))}
                 </ul>
               ) : (
                 <Vacio>Nada pendiente esta semana.</Vacio>
               )}
+            </Seccion>
+          </div>
+
+          <div className="mt-8 grid grid-cols-1 gap-8 lg:grid-cols-[minmax(0,3fr)_minmax(0,2fr)]">
+            <Seccion titulo="Actividad reciente">
+              <Actividad />
+            </Seccion>
+            <Seccion titulo="Pendiente de cobro" extra={<span className="num text-sm text-tinta-2">{euros(r.caja.pendienteCobroCent)}</span>}>
+              <PendientesCobro />
             </Seccion>
           </div>
 
@@ -90,5 +103,36 @@ export function Inicio() {
         </>
       )}
     </Datos>
+  );
+}
+
+function AtajosApuntar() {
+  const abrir = useApuntar();
+  return (
+    <div className="flex flex-wrap gap-2">
+      <Boton onClick={() => abrir({ tipo: "visita" })}>Visita</Boton>
+      <Boton onClick={() => abrir({ tipo: "venta" })}>Venta</Boton>
+      <Boton onClick={() => abrir({ tipo: "dinero" })}>Gasto o aportación</Boton>
+    </div>
+  );
+}
+
+function PendientesCobro() {
+  const q = useQuery({ queryKey: ["ventas"], queryFn: () => api.get<{ ventas: Venta[] }>("/api/ventas").then((r) => r.ventas) });
+  const pend = (q.data ?? []).filter((v) => !v.cobrada);
+  if (q.isSuccess && !pend.length) return <Vacio>Todo cobrado.</Vacio>;
+  return (
+    <ul className="divide-y divide-regla text-sm">
+      {pend.map((v) => (
+        <li key={v.id} className="flex flex-wrap items-center gap-x-3 gap-y-1 py-2">
+          <span className="min-w-0 flex-1">
+            <span className="font-medium">{v.comercio}</span>
+            <span className="num block text-[13px] text-tinta-3">#{v.id}, {fecha(v.fecha)}, vendió {v.socio}</span>
+          </span>
+          <span className="num font-medium">{euros(v.totalCent)}</span>
+          <CobrarVenta id={v.id} totalCent={v.totalCent} comercio={v.comercio} />
+        </li>
+      ))}
+    </ul>
   );
 }

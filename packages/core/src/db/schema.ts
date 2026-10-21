@@ -263,19 +263,49 @@ export const envios = pgTable("envios", {
   creadoAt: creado(),
 });
 
-export const enlacesPanel = pgTable("enlaces_panel", {
-  tokenHash: text().primaryKey(),
-  socioId: integer().notNull().references(() => socios.id),
-  expiraAt: timestamp({ withTimezone: true }).notNull(),
-  usadoAt: timestamp({ withTimezone: true }),
-});
+export const enlacesPanel = pgTable(
+  "enlaces_panel",
+  {
+    tokenHash: text().primaryKey(),
+    /** Código corto (8 cifras) para entrar desde la app instalada, donde no se puede abrir el enlace. */
+    codigoHash: text(),
+    socioId: integer().notNull().references(() => socios.id),
+    expiraAt: timestamp({ withTimezone: true }).notNull(),
+    usadoAt: timestamp({ withTimezone: true }),
+  },
+  (t) => [index("enlaces_panel_codigo").on(t.codigoHash)],
+);
 
+/** Sesiones del panel: se renuevan solas con el uso (caducan tras mucho tiempo sin entrar). */
 export const sesiones = pgTable("sesiones", {
   tokenHash: text().primaryKey(),
   socioId: integer().notNull().references(() => socios.id),
   expiraAt: timestamp({ withTimezone: true }).notNull(),
+  /** Navegador/dispositivo, para que el socio reconozca sus sesiones. */
+  dispositivo: text(),
+  ultimoUsoAt: timestamp({ withTimezone: true }),
   creadoAt: creado(),
 });
+
+/**
+ * Buzón de avisos: cualquier parte del sistema (panel, copias, despliegues, el propio bot) deja aquí un mensaje
+ * y el bot lo publica. `destino`: «grupo», «admins» o «socio» (con `socioId`). Los `silencioso` se guardan sin enviarse.
+ */
+export const avisos = pgTable(
+  "avisos",
+  {
+    id: integer().primaryKey().generatedAlwaysAsIdentity(),
+    tipo: text().notNull(),
+    destino: text().notNull().default("grupo"),
+    socioId: integer().references(() => socios.id),
+    texto: text().notNull(),
+    silencioso: boolean().notNull().default(false),
+    creadoAt: creado(),
+    enviadoAt: timestamp({ withTimezone: true }),
+    intentos: integer().notNull().default(0),
+  },
+  (t) => [index("avisos_pendientes").on(t.enviadoAt), check("avisos_destino", sql`${t.destino} in ('grupo', 'admins', 'socio')`)],
+);
 
 /** Uso diario de la IA (límite propio además del del plan gratuito). */
 export const usoIa = pgTable("uso_ia", {

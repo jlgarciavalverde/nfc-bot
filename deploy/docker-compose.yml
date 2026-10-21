@@ -96,7 +96,7 @@ services:
       - |
         copia() {
           f=/backups/nfc-$$(date +%F).sql.gz
-          pg_dump -d nfc --no-owner | gzip > $$f.tmp && mv $$f.tmp $$f || { echo "$$(date '+%F %T') FALLO: pg_dump" | tee /backups/simulacro.txt; return 1; }
+          pg_dump -d nfc --no-owner | gzip > $$f.tmp && mv $$f.tmp $$f || { echo "$$(date '+%F %T') FALLO: pg_dump" | tee /backups/simulacro.txt; avisar "FALLO: pg_dump no ha podido volcar la base de datos"; return 1; }
           find /backups -name 'nfc-*.sql.gz' -mtime +30 -delete
           find /backups -name 'pre-*.sql.gz' -mtime +90 -delete
           psql -q -d postgres -c 'drop database if exists nfc_simulacro' -c 'create database nfc_simulacro' >/dev/null
@@ -110,6 +110,15 @@ services:
           fi
           psql -q -d postgres -c 'drop database if exists nfc_simulacro' >/dev/null
           echo "$$(date '+%F %T') $$r" | tee /backups/simulacro.txt
+          avisar "$$r"
+        }
+        # Resultado al buzón de avisos del bot: si falla, los admins lo reciben por privado; si va bien, se guarda en silencio
+        # (sale en el resumen de los lunes).
+        avisar() {
+          m=$$(printf %s "$$1" | sed 's/&/\&amp;/g; s/</\&lt;/g; s/>/\&gt;/g')
+          case "$$1" in OK*) ok=1; t="✅ Copia del $$(date +%F) restaurada sin problemas" ;; *) ok=0; t="🚨 <b>La copia de seguridad ha fallado</b> ($$(date +%F)). $$m. Revisa: docker logs nfc-backup" ;; esac
+          echo "insert into avisos (tipo, destino, texto, silencioso) values ('copia', 'admins', :'t', :'ok' = '1' or coalesce((select valor from ajustes where clave = 'avisosSilenciados') ? 'copia', false))" \
+            | psql -q -d nfc -v t="$$t" -v ok="$$ok" >/dev/null 2>&1 || echo "no he podido dejar el aviso"
         }
         [ -f /backups/nfc-$$(date +%F).sql.gz ] || copia
         while true; do

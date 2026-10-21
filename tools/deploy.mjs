@@ -5,6 +5,8 @@
 //
 // Requisitos: Docker en marcha, `ssh-add --apple-use-keychain ~/.ssh/id_ed25519` hecho en una terminal normal.
 import { execFileSync } from "node:child_process";
+import { randomBytes } from "node:crypto";
+import { readFileSync } from "node:fs";
 import { resolve } from "node:path";
 
 const HOST = "joseluis@192.168.18.7";
@@ -89,6 +91,16 @@ if (hayToken) {
   } else console.log(`  bot: telegram ${b.telegram}, IA ${b.ia}`);
 } else {
   console.log(`\n  Falta el token del bot. En el VPS:\n    cd ${DIR} && read -rsp "Token de @BotFather: " T && echo && sed -i '/^BOT_TOKEN=/d' .env && echo "BOT_TOKEN=$T" >> .env && unset T && docker compose up -d`);
+}
+// Novedades de esta versión al grupo (por el buzón de avisos del bot), solo si es una versión nueva
+const notas = readFileSync(resolve(root, "docs/novedades.md"), "utf8").split(/^## /m).find((b) => b.startsWith(`${version}\n`));
+if (notas && previous !== version) {
+  const lineas = notas.split("\n").slice(1).filter((l) => l.startsWith("- ")).map((l) => `• ${l.slice(2).replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;")}`);
+  const texto = [`🆕 <b>Me he actualizado (versión ${version})</b>`, ...lineas].join("\n");
+  const tag = `nfc${randomBytes(6).toString("hex")}`;
+  const sql = `insert into avisos (tipo, destino, texto, silencioso) values ('version', 'grupo', $${tag}$${texto}$${tag}$, coalesce((select valor from ajustes where clave = 'avisosSilenciados') ? 'version', false));`;
+  execFileSync("ssh", [HOST, "docker exec -i nfc-db psql -q -U nfc -d nfc -v ON_ERROR_STOP=1"], { input: sql, stdio: ["pipe", "inherit", "inherit"] });
+  console.log("  novedades enviadas al grupo");
 }
 ssh("docker ps --filter name=nfc- --format 'table {{.Names}}\\t{{.Status}}'");
 console.log(`\n✓ ${IMAGE}:${version} desplegada.`);

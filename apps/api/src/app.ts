@@ -8,13 +8,15 @@ import fastifyStatic from "@fastify/static";
 import { sql } from "drizzle-orm";
 import { z } from "zod";
 import {
-  borrarTramo, canjearEnlace, cambiarPrecio, cerrarSesion, crearOferta, crearProducto, describirOferta, embudo, ErrorNegocio, estadoStock,
+  borrarTramo, canjearCodigo, canjearEnlace, cerrarSesionesDe, sesionesDe, cambiarPrecio, cerrarSesion, crearOferta, crearProducto, describirOferta, embudo, ErrorNegocio, estadoStock,
   fichaComercio, guardarTramo, hoy, listarLotes, listarMovimientos, listarProductos, listarVentas, ofertasDe, quitarOferta,
   recordatoriosPendientes, reparto, resumenCaja, resumenPeriodo, lunes, sumarDias, socioDeSesion, tramosDe, DIAS_SESION, type DB, type Socio,
 } from "@nfc/core";
 import type { ApiConfig } from "./config";
+import { avisoPanel, eurosTxt } from "./gestion";
 import { cajaMensual, comerciosPanel, seriesSemanales, visitasPanel } from "./datos";
 import { exportarExcel } from "./excel";
+import { registrarGestion } from "./gestion";
 
 declare module "fastify" {
   interface FastifyRequest {
@@ -59,9 +61,14 @@ export async function buildApp(db: DB, config: ApiConfig) {
   });
 
   app.decorateRequest("socio", null);
-  app.addHook("onRequest", async (req) => {
+  const cookieSesion = { path: "/", httpOnly: true, sameSite: "strict" as const, secure: config.secureCookies, maxAge: DIAS_SESION * 86_400 };
+  app.addHook("onRequest", async (req, reply) => {
+    if (!req.url.startsWith("/api/")) return;
     const sid = req.cookies[nombreCookie];
-    req.socio = sid ? await socioDeSesion(db, sid) : null;
+    const s = sid ? await socioDeSesion(db, sid) : null;
+    req.socio = s;
+    // Sesión permanente: cada día de uso se alarga otro año (cookie incluida)
+    if (s?.renovada) reply.setCookie(nombreCookie, sid!, cookieSesion);
     // CSRF: los cambios solo desde el propio panel (además de SameSite=Strict)
     if (req.method !== "GET" && req.method !== "HEAD" && req.url.startsWith("/api/")) {
       const origin = req.headers.origin;
@@ -101,13 +108,19 @@ export async function buildApp(db: DB, config: ApiConfig) {
   });
 
   // ── Sesión ──
-  app.post("/api/entrar", { config: { rateLimit: { max: 10, timeWindow: "1 minute" } } }, async (req, reply: FastifyReply) => {
-    const { token } = z.object({ token: z.string().min(20).max(100) }).parse(req.body);
-    const sesion = await canjearEnlace(db, token);
-    if (!sesion) throw new HttpError(401, "Ese enlace ya no vale (caduca a los 15 minutos y sirve una sola vez). Pide otro al bot con /panel.");
-    reply.setCookie(nombreCookie, sesion, { path: "/", httpOnly: true, sameSite: "strict", secure: config.secureCookies, maxAge: DIAS_SESION * 86_400 });
+  // Con el enlace del bot (token) o con su código de 8 cifras (app instalada). Límite estricto: 10 intentos por minuto.
+  app.post("/api/entrar", { config: { rateLimit: { max: config.loginRateLimit, timeWindow: "1 minute" } } }, async (req, reply: FastifyReply) => {
+    const b = z.union([z.object({ token: z.string().min(20).max(100) }), z.object({ codigo: z.string().min(8).max(12) })]).parse(req.body);
+    const disp = dispositivo(req.headers["user-agent"]);
+    const sesion = "token" in b ? await canjearEnlace(db, b.token, disp) : await canjearCodigo(db, b.codigo, disp);
+    if (!sesion)
+      throw new HttpError(401, "token" in b ? "Ese enlace ya no vale (caduca a los 15 minutos y sirve una sola vez). Pide otro al bot con /panel." : "Ese código no vale o ha caducado. Pide otro al bot con /panel.");
+    reply.setCookie(nombreCookie, sesion, cookieSesion);
     return { socio: publico((await socioDeSesion(db, sesion))!) };
   });
+  app.get("/api/sesiones", async (req) => (socio(req), { sesiones: await sesionesDe(db, req.socio!.id, req.cookies[nombreCookie]) }));
+  /** Cierra las demás sesiones del socio (otros dispositivos). */
+  app.delete("/api/sesiones", async (req) => ({ cerradas: await cerrarSesionesDe(db, socio(req).id, req.cookies[nombreCookie]) }));
   app.post("/api/salir", async (req, reply) => {
     const sid = req.cookies[nombreCookie];
     if (sid) await cerrarSesion(db, sid);
@@ -170,14 +183,19 @@ export async function buildApp(db: DB, config: ApiConfig) {
   app.post("/api/productos", async (req) => {
     const s = admin(req);
     const b = z.object({ nombre: z.string().trim().min(1).max(120), precioCent: euros }).parse(req.body);
-    return { producto: await crearProducto(db, b.nombre, b.precioCent, s.id) };
+    const p = await crearProducto(db, b.nombre, b.precioCent, s.id);
+    await avisoPanel(db, s, `producto ${p.nombre} a ${eurosTxt(p.precioCent)}/ud`);
+    return { producto: p };
   });
   app.put("/api/productos/:id", async (req) => {
     const s = admin(req);
     const { id } = z.object({ id: z.coerce.number().int().positive() }).parse(req.params);
     const b = z.object({ precioCent: euros }).parse(req.body);
     if (!(await listarProductos(db)).some((p) => p.id === id)) throw new HttpError(404, "Ese producto no existe.");
-    return { producto: await cambiarPrecio(db, id, b.precioCent, s.id) };
+    const antes = (await listarProductos(db)).find((p) => p.id === id)!;
+    const p = await cambiarPrecio(db, id, b.precioCent, s.id);
+    await avisoPanel(db, s, `precio de ${p.nombre}: ${eurosTxt(antes.precioCent)} → ${eurosTxt(p.precioCent)}/ud`);
+    return { producto: p };
   });
   app.put("/api/tramos", async (req) => {
     const s = admin(req);
@@ -186,12 +204,14 @@ export async function buildApp(db: DB, config: ApiConfig) {
       .refine((x) => (x.precioCent == null) !== (x.descuentoBp == null), "Pon precio o descuento, no los dos")
       .parse(req.body);
     await guardarTramo(db, b.productoId, b.desdeUds, b.precioCent ? { precioCent: b.precioCent } : { descuentoBp: b.descuentoBp! }, s.id);
+    await avisoPanel(db, s, `tramo desde ${b.desdeUds} uds a ${b.precioCent ? `${eurosTxt(b.precioCent)}/ud` : `−${b.descuentoBp! / 100} %`}`);
     return { ok: true };
   });
   app.delete("/api/tramos", async (req) => {
     const s = admin(req);
     const b = z.object({ productoId: z.coerce.number().int().positive(), desdeUds: z.coerce.number().int() }).parse(req.query);
     await borrarTramo(db, b.productoId, b.desdeUds, s.id);
+    await avisoPanel(db, s, `quitado el tramo desde ${b.desdeUds} uds`);
     return { ok: true };
   });
   app.post("/api/ofertas", async (req) => {
@@ -213,14 +233,19 @@ export async function buildApp(db: DB, config: ApiConfig) {
     if (d.tipo === "pack" && !d.precioCent) throw new HttpError(400, "Un pack necesita precio.");
     if (d.tipo === "descuento" && !d.descuentoBp) throw new HttpError(400, "Falta el porcentaje de descuento.");
     if (d.tipo === "nxm" && !d.m) throw new HttpError(400, "Falta cuántas se pagan (el 2 de 3x2).");
-    return { oferta: await crearOferta(db, b.productoId, { ...d, nombre: describirOferta(d) }, s.id) };
+    const o = await crearOferta(db, b.productoId, { ...d, nombre: describirOferta(d) }, s.id);
+    await avisoPanel(db, s, `nueva oferta ${o.nombre}${o.hasta ? ` hasta el ${o.hasta}` : ""}`);
+    return { oferta: o };
   });
   app.delete("/api/ofertas/:id", async (req) => {
     const s = admin(req);
     const { id } = z.object({ id: z.coerce.number().int().positive() }).parse(req.params);
-    await quitarOferta(db, id, s.id);
+    const o = await quitarOferta(db, id, s.id);
+    await avisoPanel(db, s, `retirada la oferta ${o.nombre}`);
     return { ok: true };
   });
+
+  await registrarGestion(app, db, { socio, admin });
 
   app.all("/api/*", async () => {
     throw new HttpError(404, "No existe.");
@@ -239,3 +264,11 @@ export async function buildApp(db: DB, config: ApiConfig) {
 }
 
 const publico = (s: Socio) => ({ id: s.id, nombre: s.nombre, rol: s.rol });
+
+/** «Chrome en Android», «Safari en iPhone»…: para reconocer las sesiones abiertas. */
+function dispositivo(ua: string | undefined) {
+  if (!ua) return null;
+  const nav = /Edg\//.test(ua) ? "Edge" : /Firefox\//.test(ua) ? "Firefox" : /Chrome\//.test(ua) ? "Chrome" : /Safari\//.test(ua) ? "Safari" : "Navegador";
+  const so = /iPhone/.test(ua) ? "iPhone" : /iPad/.test(ua) ? "iPad" : /Android/.test(ua) ? "Android" : /Mac OS X/.test(ua) ? "Mac" : /Windows/.test(ua) ? "Windows" : /Linux/.test(ua) ? "Linux" : "";
+  return so ? `${nav} en ${so}` : nav;
+}

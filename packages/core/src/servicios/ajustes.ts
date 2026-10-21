@@ -15,9 +15,11 @@ export interface Ajustes {
   productoDefectoId: number | null;
   /** Texto de bienvenida al grupo (null = el de por defecto). `{nombre}` = nombre de quien entra. */
   bienvenida: string | null;
+  /** Tipos de aviso automático que no se publican (ver TIPOS_AVISO). */
+  avisosSilenciados: string[];
 }
 
-const DEFECTO: Ajustes = { grupoChatId: null, stockMin: 5, modoReparto: "igual", comisionBp: 0, productoDefectoId: null, bienvenida: null };
+const DEFECTO: Ajustes = { grupoChatId: null, stockMin: 5, modoReparto: "igual", comisionBp: 0, productoDefectoId: null, bienvenida: null, avisosSilenciados: [] };
 
 export async function leerAjustes(db: Tx): Promise<Ajustes> {
   const filas = await db.select().from(ajustes);

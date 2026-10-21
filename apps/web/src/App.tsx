@@ -3,7 +3,10 @@ import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { Link, Route, Switch, useLocation } from "wouter";
 import { api, ErrorApi } from "./lib/api";
 import type { Socio } from "./lib/tipos";
-import { Boton } from "./componentes/ui";
+import { Boton, Campo } from "./componentes/ui";
+import { ApuntarProvider, useApuntar } from "./componentes/Apuntar";
+import { AvisosProvider } from "./lib/acciones";
+import { Cuenta } from "./paginas/Cuenta";
 import { Inicio } from "./paginas/Inicio";
 import { Comercios } from "./paginas/Comercios";
 import { Ventas } from "./paginas/Ventas";
@@ -23,6 +26,7 @@ const NAV = [
   ["/stock", "Stock"],
   ["/reparto", "Reparto"],
   ["/precios", "Precios"],
+  ["/cuenta", "Cuenta"],
 ] as const;
 
 export function useYo() {
@@ -55,28 +59,67 @@ function Entrar() {
   );
 }
 
+/** Sin sesión: se entra con el enlace del bot o, en la app instalada (donde el enlace se abriría en el navegador), con su código. */
 function SinSesion() {
+  const qc = useQueryClient();
+  const [codigo, setCodigo] = useState("");
+  const [error, setError] = useState<string | null>(null);
+  const [ocupado, setOcupado] = useState(false);
+  const entrar = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setError(null);
+    setOcupado(true);
+    try {
+      const r = await api.post<{ socio: Socio }>("/api/entrar", { codigo });
+      qc.setQueryData(["yo"], r.socio);
+    } catch (x) {
+      setError((x as Error).message);
+    } finally {
+      setOcupado(false);
+    }
+  };
   return (
-    <main className="mx-auto max-w-md px-4 py-20">
+    <main className="mx-auto max-w-sm px-4 py-16">
       <h1 className="text-xl font-semibold">Panel de socios</h1>
-      <p className="mt-3 text-tinta-2">Para entrar, escribe <b className="font-mono">/panel</b> al bot de Telegram y abre el enlace que te manda por privado.</p>
+      <p className="mt-3 text-tinta-2">
+        Escribe <b className="font-mono">/panel</b> al bot de Telegram. Te manda un enlace (ábrelo y listo) y un código de 8 cifras para entrar aquí.
+      </p>
+      <form onSubmit={entrar} className="mt-6 space-y-3" aria-label="Entrar con código">
+        <Campo etiqueta="Código" inputMode="numeric" autoComplete="one-time-code" placeholder="1234 5678" value={codigo} onChange={(e) => setCodigo(e.target.value)} required />
+        {error && <p role="alert" className="text-sm text-sale">{error}</p>}
+        <Boton type="submit" variante="primario" className="w-full" disabled={ocupado}>Entrar</Boton>
+      </form>
+      <p className="mt-6 text-[13px] text-tinta-3">La sesión se queda abierta en este dispositivo. Para cerrarla en todos: /panel cerrar.</p>
     </main>
+  );
+}
+
+function BotonApuntar() {
+  const abrir = useApuntar();
+  return (
+    <Boton variante="primario" onClick={() => abrir({ tipo: "venta" })}>
+      Apuntar
+    </Boton>
   );
 }
 
 export function App() {
   const [ruta] = useLocation();
   const yo = useYo();
-  const qc = useQueryClient();
-  if (ruta === "/entrar") return <Entrar />;
+  if (ruta === "/entrar") return <AvisosProvider><Entrar /></AvisosProvider>;
   if (yo.isPending) return <p className="p-8 text-tinta-3" role="status">Cargando…</p>;
   if (yo.isError) return yo.error instanceof ErrorApi && yo.error.status === 401 ? <SinSesion /> : <p className="p-8 text-sale" role="alert">{yo.error.message}</p>;
 
-  const salir = async () => {
-    await api.post("/api/salir");
-    qc.clear();
-    location.href = "/";
-  };
+  return (
+    <AvisosProvider>
+      <ApuntarProvider>
+        <Marco nombre={yo.data.nombre} ruta={ruta} />
+      </ApuntarProvider>
+    </AvisosProvider>
+  );
+}
+
+function Marco({ nombre, ruta }: { nombre: string; ruta: string }) {
   return (
     <div className="min-h-dvh">
       <header className="border-b border-regla bg-papel">
@@ -86,11 +129,11 @@ export function App() {
             Panel de socios
           </div>
           <div className="ml-auto flex items-center gap-2 text-sm">
-            <span className="text-tinta-2">{yo.data.nombre}</span>
+            <Link href="/cuenta" className="hidden text-tinta-2 underline-offset-2 hover:underline sm:inline">{nombre}</Link>
             <a href="/api/exportar.xlsx" className="inline-flex min-h-9 items-center rounded-md border border-regla-2 px-3 font-medium hover:bg-fondo" download>
-              Descargar Excel
+              Excel
             </a>
-            <Boton variante="plano" onClick={salir}>Salir</Boton>
+            <BotonApuntar />
           </div>
         </div>
         <nav aria-label="Secciones" className="mx-auto max-w-6xl overflow-x-auto px-4">
@@ -122,6 +165,7 @@ export function App() {
           <Route path="/stock" component={Stock} />
           <Route path="/reparto" component={Reparto} />
           <Route path="/precios" component={Precios} />
+          <Route path="/cuenta" component={Cuenta} />
           <Route>
             <p>Esta página no existe. <Link href="/" className="underline">Volver al resumen</Link></p>
           </Route>
