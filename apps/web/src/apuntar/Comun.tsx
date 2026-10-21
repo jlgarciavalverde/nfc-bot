@@ -42,7 +42,22 @@ export function ElegirComercio({ valor, onChange, avanzar, permitirNuevo = true 
       <label htmlFor={id} className="sr-only">Buscar comercio</label>
       <div className="flex items-center gap-2 rounded-[12px] border border-control bg-superficie px-3 focus-within:border-tinta">
         <MagnifyingGlass size={18} className="shrink-0 text-tinta-3" />
-        <input id={id} value={texto} onChange={(e) => setTexto(e.target.value)} placeholder="Escribe el nombre" autoComplete="off" className="min-h-12 w-full bg-transparent text-[16px] outline-none placeholder:text-tinta-3" />
+        <input
+          id={id}
+          value={texto}
+          onChange={(e) => setTexto(e.target.value)}
+          // Enter elige el primero de la lista (o crea el comercio si no hay ninguno que encaje)
+          onKeyDown={(e) => {
+            if (e.key !== "Enter" || !t) return;
+            e.preventDefault();
+            if (lista[0]) elegir({ id: lista[0].id, nombre: lista[0].nombre });
+            else if (permitirNuevo) elegir({ nuevo: texto.trim() });
+          }}
+          placeholder="Escribe el nombre"
+          autoComplete="off"
+          autoCapitalize="words"
+          enterKeyHint="go"
+          className="min-h-12 w-full bg-transparent text-[16px] outline-none placeholder:text-tinta-3" />
       </div>
       {valor && !t && <p className="text-[14px] text-tinta-2">Elegido: <b className="font-semibold text-tinta">{nombreEleccion(valor)}</b>{"nuevo" in valor ? " (nuevo)" : ""}</p>}
       <ul className="divide-y divide-borde overflow-hidden rounded-[12px] border border-borde bg-superficie" aria-label={t ? "Resultados" : "Últimos visitados"}>

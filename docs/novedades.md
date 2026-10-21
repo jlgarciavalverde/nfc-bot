@@ -3,6 +3,13 @@
 Lo que el bot anuncia en el grupo al actualizarse (`tools/deploy.mjs` publica la sección de la versión que despliega).
 Frases cortas, para los socios, sin tecnicismos.
 
+## 0.6.1
+- Panel más cómodo en el móvil con el teclado abierto: el botón Siguiente/Guardar y lo que escribes ya no quedan tapados, y la barra de abajo se aparta mientras escribes.
+- Teclado adecuado en cada campo (números, enlaces, mayúsculas en nombres) y la tecla «Siguiente» del teclado avanza de paso.
+- Al buscar un comercio, Enter elige el primero de la lista.
+- Si cierras un asistente a medias, al volver sigues donde lo dejaste (o «Empezar de cero»).
+- Las cifras grandes de Hoy ya no se cortan en móviles pequeños.
+
 ## 0.6.0
 - Ahora podéis darme personalidad: un nombre, un tono (cercano, serio o gracioso) y emojis sí o no. Se cambia en el panel (Ajustes) o con /config tono, /config nombre y /config emojis.
 - Notas para cuando me habláis normal, p. ej. «responde en una línea»: /config ia o en Ajustes. Lo que apunte os lo sigo pidiendo confirmar.

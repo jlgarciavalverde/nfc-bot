@@ -1,5 +1,6 @@
 import { forwardRef, useId, type InputHTMLAttributes, type ReactNode, type TextareaHTMLAttributes } from "react";
 import { RadioGroup, Switch } from "radix-ui";
+import { usePaso } from "./contextoPaso";
 
 const CONTROL = "w-full rounded-[10px] border border-control bg-superficie px-3 text-[16px] text-tinta placeholder:text-tinta-3/80 transition-colors focus:border-tinta focus:outline-none focus-visible:outline-2 focus-visible:outline-foco disabled:opacity-50 aria-[invalid=true]:border-sale";
 
@@ -23,10 +24,12 @@ function Envuelve({ id, etiqueta, ayuda, error, oculta, children }: Envoltura & 
 /** Campo de texto con etiqueta, ayuda y error (16 px para que iOS no haga zoom). */
 export const Campo = forwardRef<HTMLInputElement, InputHTMLAttributes<HTMLInputElement> & Envoltura & { sufijo?: ReactNode }>(function Campo({ etiqueta, ayuda, error, oculta, sufijo, className = "", ...p }, ref) {
   const id = useId();
+  const paso = usePaso();
   return (
     <Envuelve id={id} etiqueta={etiqueta} ayuda={ayuda} error={error} oculta={oculta}>
       <div className="relative">
         <input
+          enterKeyHint={paso ? (paso.ultimo ? "done" : "next") : undefined}
           ref={ref}
           id={id}
           aria-invalid={!!error || undefined}
@@ -52,11 +55,12 @@ export const Area = forwardRef<HTMLTextAreaElement, TextareaHTMLAttributes<HTMLT
 /** Importe grande en euros (paso «¿cuánto?» de los asistentes). */
 export const Importe = forwardRef<HTMLInputElement, InputHTMLAttributes<HTMLInputElement> & Envoltura>(function Importe({ etiqueta, ayuda, error, className = "", ...p }, ref) {
   const id = useId();
+  const paso = usePaso();
   return (
     <Envuelve id={id} etiqueta={etiqueta} ayuda={ayuda} error={error}>
       <div className="flex items-baseline gap-2 border-b-2 border-control pb-1 focus-within:border-tinta">
-        <input ref={ref} id={id} inputMode="decimal" autoComplete="off" aria-invalid={!!error || undefined} {...p} className={`num w-full min-w-0 bg-transparent text-[40px] font-bold leading-tight tracking-tight text-tinta outline-none placeholder:text-tinta-3/50 ${className}`} />
-        <span className="text-[28px] font-bold text-tinta-3">€</span>
+        <input ref={ref} id={id} inputMode="decimal" autoComplete="off" enterKeyHint={paso ? (paso.ultimo ? "done" : "next") : undefined} aria-invalid={!!error || undefined} {...p} className={`num w-full min-w-0 bg-transparent text-[34px] font-bold leading-tight tracking-tight text-tinta sm:text-[40px] outline-none placeholder:text-tinta-3/50 ${className}`} />
+        <span className="text-[24px] font-bold text-tinta-3 sm:text-[28px]">€</span>
       </div>
     </Envuelve>
   );

@@ -35,7 +35,7 @@ export function enlaceResenas(texto: string): { url: string | null; error: strin
 export function AsistentePlaca({ comercio, codigo: codigoInicial, hecho }: { comercio?: { id: number; nombre: string }; codigo?: string; hecho: () => void }) {
   const avisar = useAviso();
   const comercios = useComercios();
-  const [d, poner, limpiar] = useBorrador<{ codigo: string; comercio: Eleccion | null; resenas: string; grabada: boolean; bloqueada: boolean }>(`placa:${comercio?.id ?? ""}:${codigoInicial ?? ""}`, {
+  const [d, poner, limpiar, borrador] = useBorrador<{ codigo: string; comercio: Eleccion | null; resenas: string; grabada: boolean; bloqueada: boolean }>(`placa:${comercio?.id ?? ""}:${codigoInicial ?? ""}`, {
     codigo: codigoInicial ?? "",
     comercio: comercio ?? null,
     resenas: "",
@@ -62,6 +62,7 @@ export function AsistentePlaca({ comercio, codigo: codigoInicial, hecho }: { com
 
   return (
     <Pasos
+      borrador={borrador}
       textoFinal="Activar placa"
       ocupado={m.isPending}
       onTerminar={() =>
@@ -210,7 +211,7 @@ function PasoResenas({ valor, actual, onChange, enlace, nombre }: { valor: strin
           <p className="mt-2 text-tinta-2">Sigue sin cambiar nada, o pega otro abajo para sustituirlo.</p>
         </div>
       )}
-      <Campo etiqueta="Enlace o ID del sitio" placeholder="https://g.page/r/…/review o ChIJ…" value={valor} onChange={(e) => onChange(e.target.value)} error={enlace.error} autoComplete="off" spellCheck={false} />
+      <Campo etiqueta="Enlace o ID del sitio" placeholder="https://g.page/r/…/review o ChIJ…" value={valor} onChange={(e) => onChange(e.target.value)} error={enlace.error} inputMode="url" autoComplete="off" autoCapitalize="none" autoCorrect="off" spellCheck={false} />
       {enlace.url && !enlace.error && valor && (
         <a href={enlace.url} target="_blank" rel="noreferrer noopener" className="inline-flex items-center gap-1.5 text-[14px] font-semibold underline underline-offset-2">
           Probar el enlace <ArrowSquareOut size={15} />

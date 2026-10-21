@@ -169,9 +169,12 @@ function EditarDatos({ c, hecho }: { c: Comercio; hecho: () => void }) {
       }}
     >
       {CAMPOS.map(([k, t]) => (
-        <Campo key={k} etiqueta={t} value={d[k]} onChange={(e) => setD({ ...d, [k]: e.target.value })} maxLength={500} type={k === "maps" || k === "resenas" ? "url" : "text"} ayuda={k === "resenas" ? "El de «Pedir reseñas» del perfil de Google (https://g.page/r/…/review). Es adonde llevan sus placas." : undefined} />
+        <Campo key={k} etiqueta={t} value={d[k]} onChange={(e) => setD({ ...d, [k]: e.target.value })} maxLength={500} autoComplete="off" {...(k === "maps" || k === "resenas" ? { type: "url", inputMode: "url" as const, autoCapitalize: "none", autoCorrect: "off", spellCheck: false } : { type: "text", autoCapitalize: k === "nota" ? "sentences" : "words" })} ayuda={k === "resenas" ? "El de «Pedir reseñas» del perfil de Google (https://g.page/r/…/review). Es adonde llevan sus placas." : undefined} />
       ))}
-      <Boton type="submit" variante="primario" tamano="lg" className="w-full" cargando={m.isPending} icono={<Storefront size={18} />}>Guardar cambios</Boton>
+      {/* Pegado abajo: con el teclado abierto se puede guardar sin bajar hasta el final */}
+      <div className="sticky bottom-0 -mx-5 bg-fondo px-5 pb-1 pt-3">
+        <Boton type="submit" variante="primario" tamano="lg" className="w-full" cargando={m.isPending} icono={<Storefront size={18} />}>Guardar cambios</Boton>
+      </div>
     </form>
   );
 }

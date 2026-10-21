@@ -23,10 +23,10 @@ export function useEsMovil() {
 export function Hoja({ abierta, onCerrar, titulo, descripcion, children, pie }: { abierta: boolean; onCerrar: () => void; titulo: string; descripcion?: string; children: ReactNode; pie?: ReactNode }) {
   const movil = useEsMovil();
   const cabecera = (T: typeof Dialog.Title, D: typeof Dialog.Description) => (
-    <div className="flex items-start justify-between gap-3 px-5 pb-3 pt-4">
+    <div className="flex items-start justify-between gap-3 px-5 pb-3 pt-4 teclado:pb-1 teclado:pt-2">
       <div className="min-w-0">
-        <T className="truncate text-[19px] font-bold">{titulo}</T>
-        {descripcion ? <D className="mt-0.5 text-[13px] text-tinta-3">{descripcion}</D> : <D className="sr-only">{titulo}</D>}
+        <T className="truncate text-[19px] font-bold teclado:text-[16px]">{titulo}</T>
+        {descripcion ? <D className="mt-0.5 text-[13px] text-tinta-3 teclado:sr-only">{descripcion}</D> : <D className="sr-only">{titulo}</D>}
       </div>
       <Dialog.Close asChild>
         <BotonIcono etiqueta="Cerrar" className="-mr-2 -mt-1"><X size={20} weight="bold" /></BotonIcono>
@@ -38,11 +38,12 @@ export function Hoja({ abierta, onCerrar, titulo, descripcion, children, pie }: 
       <Drawer.Root open={abierta} onOpenChange={(o) => !o && onCerrar()} repositionInputs={false}>
         <Drawer.Portal>
           <Drawer.Overlay className="fixed inset-0 z-40 bg-black/45" />
-          <Drawer.Content className="fixed inset-x-0 bottom-0 z-50 flex max-h-[94dvh] flex-col rounded-t-[20px] bg-fondo outline-none" aria-describedby={undefined}>
-            <div aria-hidden className="mx-auto mt-2.5 h-1.5 w-10 shrink-0 rounded-full bg-borde-fuerte" />
+          {/* Con el teclado abierto la hoja se apoya encima de él (--teclado, iOS) y nunca es más alta que lo visible (--vvh) */}
+          <Drawer.Content className="hoja-movil fixed inset-x-0 z-50 flex flex-col rounded-t-[20px] bg-fondo outline-none" aria-describedby={undefined}>
+            <div aria-hidden className="mx-auto mt-2.5 h-1.5 w-10 shrink-0 rounded-full bg-borde-fuerte teclado:hidden" />
             {cabecera(Drawer.Title as never, Drawer.Description as never)}
-            <div className="min-h-0 flex-1 overflow-y-auto overscroll-contain px-5 pb-4">{children}</div>
-            {pie && <div className="border-t border-borde bg-fondo px-5 pb-[max(16px,env(safe-area-inset-bottom))] pt-3">{pie}</div>}
+            <div className="min-h-0 flex-1 overflow-y-auto overscroll-contain px-5 pb-4 scroll-pb-28">{children}</div>
+            {pie && <div className="border-t border-borde bg-fondo px-5 pb-[max(16px,env(safe-area-inset-bottom))] pt-3 teclado:pb-3">{pie}</div>}
           </Drawer.Content>
         </Drawer.Portal>
       </Drawer.Root>
@@ -54,7 +55,7 @@ export function Hoja({ abierta, onCerrar, titulo, descripcion, children, pie }: 
         <Dialog.Overlay className="fixed inset-0 z-40 bg-black/35 data-[state=open]:animate-[fade_150ms]" />
         <Dialog.Content className="fixed inset-y-3 right-3 z-50 flex w-[min(480px,calc(100vw-24px))] flex-col overflow-hidden rounded-[20px] border border-borde bg-fondo shadow-2xl outline-none data-[state=open]:animate-entrar">
           {cabecera(Dialog.Title, Dialog.Description)}
-          <div className="min-h-0 flex-1 overflow-y-auto px-5 pb-5">{children}</div>
+          <div className="min-h-0 flex-1 overflow-y-auto px-5 pb-5 scroll-pb-28">{children}</div>
           {pie && <div className="border-t border-borde px-5 py-3">{pie}</div>}
         </Dialog.Content>
       </Dialog.Portal>

@@ -37,7 +37,7 @@ export function AvisosProvider({ children }: { children: ReactNode }) {
   return (
     <Ctx.Provider value={avisar}>
       {children}
-      <div className="pointer-events-none fixed inset-x-0 bottom-[calc(76px+env(safe-area-inset-bottom))] z-[90] flex flex-col items-center gap-2 px-4 lg:bottom-6" role="status" aria-live="polite">
+      <div className="pointer-events-none fixed inset-x-0 bottom-[calc(76px+env(safe-area-inset-bottom))] z-[90] teclado:bottom-[calc(var(--teclado,0px)+12px)] flex flex-col items-center gap-2 px-4 lg:bottom-6" role="status" aria-live="polite">
         {lista.map((a) => (
           <div key={a.id} className={`animate-entrar pointer-events-auto flex max-w-md items-center gap-3 rounded-xl px-4 py-3 text-[14px] font-medium shadow-[0_10px_30px_-10px_rgba(0,0,0,0.5)] ${a.tono === "error" ? "bg-sale text-white" : "bg-base text-sobre-base dark:bg-sobre-base dark:text-base"}`}>
             <span className="min-w-0">{a.texto}</span>

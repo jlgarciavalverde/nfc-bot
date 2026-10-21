@@ -115,7 +115,7 @@ function Formulario({ a, tipos }: { a: Ajustes; tipos: Record<string, string> })
           <Area etiqueta="Texto al entrar alguien" value={d.bienvenida ?? ""} onChange={(e) => setD({ ...d, bienvenida: e.target.value })} placeholder="👋 ¡Bienvenido/a, {nombre}! Aquí llevamos todo el negocio…" maxLength={1000} rows={4} ayuda="{nombre} se cambia por el nombre de quien entra y {bot} por el del asistente. Vacío: el texto de siempre." />
         </Tarjeta>
       </Seccion>
-      <div className={`fixed inset-x-0 bottom-[calc(64px+env(safe-area-inset-bottom))] z-20 border-t border-borde bg-superficie/95 px-4 py-3 backdrop-blur transition-transform lg:bottom-0 lg:left-[248px] ${sucio ? "translate-y-0" : "pointer-events-none translate-y-[200%]"}`}>
+      <div className={`fixed inset-x-0 bottom-[calc(64px+env(safe-area-inset-bottom))] z-20 border-t border-borde bg-superficie/95 px-4 py-3 backdrop-blur transition-transform lg:bottom-0 lg:left-[248px] teclado:bottom-0 ${sucio ? "translate-y-0" : "pointer-events-none translate-y-[200%]"}`}>
         <div className="mx-auto flex max-w-6xl items-center justify-end gap-2">
           <span className="mr-auto text-[14px] font-semibold">Cambios sin guardar</span>
           <Boton variante="plano" onClick={() => (setD(a), setComision(String(a.comisionBp / 100)))}>Descartar</Boton>

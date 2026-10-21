@@ -88,6 +88,20 @@ Hecho todo el plan (F0–F6):
 - `borrarComandos` necesita que el bot sea admin del grupo con «Eliminar mensajes»; si no, Telegram lo rechaza sin más.
 - e2e: `LOGIN_RATE_LIMIT=100` en `playwright.config.ts` (con 14 tests se pasaba de 10 inicios/min).
 
+## v0.6.1 (2026-10-21): usabilidad en el móvil
+- Teclado: viewport `interactive-widget=resizes-content` (Android encoge la ventana) y `lib/teclado.ts` (`useTeclado` en
+  `App.tsx`): publica `--vvh`, `--teclado` (lo que tapa en iOS) y `html[data-teclado]`; variante Tailwind `teclado:`.
+  La hoja del móvil (`.hoja-movil`) se apoya encima del teclado; cabecera compacta; `scroll-pb-28` para que el campo enfocado
+  no quede bajo la barra de botones. Barra inferior oculta con teclado; toast y barra de Ajustes se recolocan.
+- `Pasos`: el aviso de error va pegado a los botones; en pantallas táctiles solo se abre el teclado al cambiar de paso si el
+  paso tiene `escribir: true`; `ContextoPaso` pone `enterKeyHint` (next/done) a `Campo` e `Importe`; aviso de borrador
+  recuperado con «Empezar de cero» (`useBorrador` devuelve un 4.º elemento).
+- Campos: `autoCapitalize`/`autoComplete`/`inputMode` revisados; Enter en «¿Qué comercio?» elige el primero; chips de 44 px;
+  `Cifra` sin `truncate` (tamaño con `clamp`); editar datos del comercio con «Guardar» pegado abajo.
+- e2e: proyectos `escritorio` y `movil` (375×667 táctil, `e2e/movil.spec.ts`): teclado simulado encogiendo el viewport
+  (Android) y simulando `visualViewport` (iOS), sin desbordes en ninguna página, borrador, axe en hojas. Con
+  `CAPTURAS=carpeta` guarda capturas para revisar.
+
 ## Pendiente (lo tiene que hacer el usuario)
 1. Crear el bot en @BotFather y poner `BOT_TOKEN` en el VPS (ver OPERACIONES). Desactivar *privacy mode* (`/setprivacy` → Disable)
    para que entienda frases en el grupo cuando le mencionan.

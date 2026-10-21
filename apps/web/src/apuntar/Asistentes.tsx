@@ -22,7 +22,7 @@ const RESULTADOS = {
 type Resultado = keyof typeof RESULTADOS;
 
 export function AsistenteVisita({ comercio, hecho }: Props) {
-  const [d, poner, limpiar] = useBorrador<{ comercio: Eleccion | null; resultado: Resultado | null; nota: string; proxima: string }>(`visita:${comercio?.id ?? ""}`, { comercio: comercio ?? null, resultado: null, nota: "", proxima: enDias(14) });
+  const [d, poner, limpiar, borrador] = useBorrador<{ comercio: Eleccion | null; resultado: Resultado | null; nota: string; proxima: string }>(`visita:${comercio?.id ?? ""}`, { comercio: comercio ?? null, resultado: null, nota: "", proxima: enDias(14) });
   const volver = d.resultado === "luego" || d.resultado === "interesado";
   const m = useAccion(
     async () => api.post("/api/visitas", { comercioId: await idComercio(d.comercio!), resultado: d.resultado, nota: d.nota, proxima: volver ? d.proxima : null }),
@@ -31,6 +31,7 @@ export function AsistenteVisita({ comercio, hecho }: Props) {
   );
   return (
     <Pasos
+      borrador={borrador}
       textoFinal="Apuntar visita"
       ocupado={m.isPending}
       onTerminar={() => m.mutate(undefined, { onSuccess: () => (limpiar(), hecho()) })}
@@ -47,7 +48,7 @@ export function AsistenteVisita({ comercio, hecho }: Props) {
           titulo: d.resultado === "no" ? "¿Por qué no?" : "Detalles",
           contenido: () => (
             <div className="space-y-4">
-              <Area etiqueta={d.resultado === "no" ? "Motivo" : "Nota"} placeholder={d.resultado === "no" ? "Muy caro, ya tiene QR…" : "Vuelve el dueño, pide precio para 5…"} value={d.nota} onChange={(e) => poner({ nota: e.target.value })} maxLength={500} />
+              <Area etiqueta={d.resultado === "no" ? "Motivo" : "Nota"} autoCapitalize="sentences" placeholder={d.resultado === "no" ? "Muy caro, ya tiene QR…" : "Vuelve el dueño, pide precio para 5…"} value={d.nota} onChange={(e) => poner({ nota: e.target.value })} maxLength={500} />
               {volver && <Campo etiqueta="Volver el" type="date" min={enDias(1)} value={d.proxima} onChange={(e) => poner({ proxima: e.target.value })} ayuda="Ese día a las 9:00 te lo recuerdo por Telegram." />}
             </div>
           ),
@@ -63,7 +64,7 @@ type Cobro = keyof typeof COBROS;
 
 export function AsistenteVenta({ comercio, hecho }: Props) {
   const precios = usePrecios();
-  const [d, poner, limpiar] = useBorrador<{ comercio: Eleccion | null; productoId: string; uds: string; pactado: string; cobro: Cobro | null; nota: string }>(`venta:${comercio?.id ?? ""}`, { comercio: comercio ?? null, productoId: "", uds: "1", pactado: "", cobro: null, nota: "" });
+  const [d, poner, limpiar, borrador] = useBorrador<{ comercio: Eleccion | null; productoId: string; uds: string; pactado: string; cobro: Cobro | null; nota: string }>(`venta:${comercio?.id ?? ""}`, { comercio: comercio ?? null, productoId: "", uds: "1", pactado: "", cobro: null, nota: "" });
   const prods = precios.data ?? [];
   const p = prods.find((x) => String(x.id) === d.productoId) ?? prods[0];
   const n = Number(d.uds);
@@ -78,6 +79,7 @@ export function AsistenteVenta({ comercio, hecho }: Props) {
   if (precios.isSuccess && !prods.length) return <p className="text-tinta-2">Antes hay que crear el producto en Precios.</p>;
   return (
     <Pasos
+      borrador={borrador}
       textoFinal={`Apuntar venta de ${euros(total)}`}
       ocupado={m.isPending}
       onTerminar={() => m.mutate(undefined, { onSuccess: () => (limpiar(), hecho()) })}
@@ -103,7 +105,7 @@ export function AsistenteVenta({ comercio, hecho }: Props) {
                   </div>
                 </div>
               )}
-              <Campo etiqueta="Precio pactado (opcional)" inputMode="decimal" placeholder="Solo si habéis acordado otro precio" value={d.pactado} onChange={(e) => poner({ pactado: e.target.value })} sufijo="€" />
+              <Campo etiqueta="Precio pactado (opcional)" inputMode="decimal" autoComplete="off" placeholder="Solo si habéis acordado otro precio" value={d.pactado} onChange={(e) => poner({ pactado: e.target.value })} sufijo="€" />
             </div>
           ),
         },
@@ -119,7 +121,7 @@ export function AsistenteVenta({ comercio, hecho }: Props) {
           contenido: () => (
             <div className="space-y-4">
               <Resumen filas={[["Comercio", nombreEleccion(d.comercio)], ["Paneles", n], ["Total", euros(total)], ["Cobro", d.cobro ? COBROS[d.cobro] : "—"]]} />
-              <Campo etiqueta="Nota (opcional)" value={d.nota} onChange={(e) => poner({ nota: e.target.value })} maxLength={500} />
+              <Campo etiqueta="Nota (opcional)" autoCapitalize="sentences" autoComplete="off" value={d.nota} onChange={(e) => poner({ nota: e.target.value })} maxLength={500} />
             </div>
           ),
         },
@@ -137,17 +139,18 @@ const DINERO = {
 type TipoDinero = keyof typeof DINERO;
 
 export function AsistenteDinero({ hecho }: Props) {
-  const [d, poner, limpiar] = useBorrador<{ tipo: TipoDinero | null; importe: string; categoria: string; nota: string }>("dinero", { tipo: null, importe: "", categoria: "", nota: "" });
+  const [d, poner, limpiar, borrador] = useBorrador<{ tipo: TipoDinero | null; importe: string; categoria: string; nota: string }>("dinero", { tipo: null, importe: "", categoria: "", nota: "" });
   const cent = aCent(d.importe);
   const m = useAccion(() => api.post("/api/movimientos", { tipo: d.tipo, cent, categoria: d.categoria, nota: d.nota }), `${d.tipo ? DINERO[d.tipo].texto : "Movimiento"} de ${euros(cent ?? 0)} apuntado`, { deshacer: true });
   return (
     <Pasos
+      borrador={borrador}
       textoFinal="Apuntar"
       ocupado={m.isPending}
       onTerminar={() => m.mutate(undefined, { onSuccess: () => (limpiar(), hecho()) })}
       pasos={[
         { titulo: "¿Qué es?", validar: () => (d.tipo ? null : "Elige qué tipo de movimiento es."), contenido: (av) => <Opciones etiqueta="Tipo" oculta valor={d.tipo} onChange={(t) => (poner({ tipo: t }), av())} opciones={(Object.keys(DINERO) as TipoDinero[]).map((k) => ({ valor: k, ...DINERO[k] }))} /> },
-        { titulo: "¿Cuánto?", validar: () => (cent ? null : "Pon un importe válido, p. ej. 30 o 12,50."), contenido: () => <Importe etiqueta="Importe" placeholder="0" value={d.importe} onChange={(e) => poner({ importe: e.target.value })} /> },
+        { titulo: "¿Cuánto?", escribir: true, validar: () => (cent ? null : "Pon un importe válido, p. ej. 30 o 12,50."), contenido: () => <Importe etiqueta="Importe" placeholder="0" value={d.importe} onChange={(e) => poner({ importe: e.target.value })} /> },
         {
           titulo: d.tipo === "gasto" ? "¿En qué?" : "Nota",
           contenido: () => (
@@ -156,13 +159,13 @@ export function AsistenteDinero({ hecho }: Props) {
                 <>
                   <div className="flex flex-wrap gap-2">
                     {["imprenta", "gasolina", "material", "publicidad", "envíos"].map((c) => (
-                      <button key={c} type="button" onClick={() => poner({ categoria: c })} aria-pressed={d.categoria === c} className="rounded-full border border-borde-fuerte px-3 py-1.5 text-[14px] font-semibold capitalize aria-pressed:border-base aria-pressed:bg-base aria-pressed:text-sobre-base">{c}</button>
+                      <button key={c} type="button" onClick={() => poner({ categoria: c })} aria-pressed={d.categoria === c} className="min-h-11 rounded-full border border-borde-fuerte px-3.5 py-2 text-[14px] font-semibold capitalize aria-pressed:border-base aria-pressed:bg-base aria-pressed:text-sobre-base">{c}</button>
                     ))}
                   </div>
-                  <Campo etiqueta="Categoría" value={d.categoria} onChange={(e) => poner({ categoria: e.target.value })} maxLength={60} />
+                  <Campo etiqueta="Categoría" autoCapitalize="none" autoComplete="off" value={d.categoria} onChange={(e) => poner({ categoria: e.target.value })} maxLength={60} />
                 </>
               )}
-              <Campo etiqueta="Nota (opcional)" value={d.nota} onChange={(e) => poner({ nota: e.target.value })} maxLength={500} />
+              <Campo etiqueta="Nota (opcional)" autoCapitalize="sentences" autoComplete="off" value={d.nota} onChange={(e) => poner({ nota: e.target.value })} maxLength={500} />
             </div>
           ),
         },
@@ -172,7 +175,7 @@ export function AsistenteDinero({ hecho }: Props) {
 }
 
 export function AsistenteComercio({ hecho }: Props) {
-  const [d, poner, limpiar] = useBorrador("comercio", { nombre: "", tipo: "", zona: "", direccion: "", contacto: "", mapsUrl: "", lat: null as number | null, lon: null as number | null });
+  const [d, poner, limpiar, borrador] = useBorrador("comercio", { nombre: "", tipo: "", zona: "", direccion: "", contacto: "", mapsUrl: "", lat: null as number | null, lon: null as number | null });
   const m = useAccion(() => api.post("/api/comercios", { ...d, lat: d.lat ?? undefined, lon: d.lon ?? undefined }), `Comercio «${d.nombre}» apuntado`, { deshacer: true });
   const ubicar = () =>
     navigator.geolocation?.getCurrentPosition(
@@ -182,22 +185,24 @@ export function AsistenteComercio({ hecho }: Props) {
     );
   return (
     <Pasos
+      borrador={borrador}
       textoFinal="Apuntar comercio"
       ocupado={m.isPending}
       onTerminar={() => m.mutate(undefined, { onSuccess: () => (limpiar(), hecho()) })}
       pasos={[
         {
           titulo: "¿Cómo se llama?",
+          escribir: true,
           validar: () => (d.nombre.trim() ? null : "Falta el nombre."),
           contenido: () => (
             <div className="space-y-4">
-              <Campo etiqueta="Nombre" value={d.nombre} onChange={(e) => poner({ nombre: e.target.value })} maxLength={120} autoComplete="off" />
+              <Campo etiqueta="Nombre" value={d.nombre} onChange={(e) => poner({ nombre: e.target.value })} maxLength={120} autoComplete="off" autoCapitalize="words" />
               <div className="flex flex-wrap gap-2">
                 {["bar", "restaurante", "cafetería", "peluquería", "tienda", "clínica"].map((t) => (
-                  <button key={t} type="button" onClick={() => poner({ tipo: t })} aria-pressed={d.tipo === t} className="rounded-full border border-borde-fuerte px-3 py-1.5 text-[14px] font-semibold capitalize aria-pressed:border-base aria-pressed:bg-base aria-pressed:text-sobre-base">{t}</button>
+                  <button key={t} type="button" onClick={() => poner({ tipo: t })} aria-pressed={d.tipo === t} className="min-h-11 rounded-full border border-borde-fuerte px-3.5 py-2 text-[14px] font-semibold capitalize aria-pressed:border-base aria-pressed:bg-base aria-pressed:text-sobre-base">{t}</button>
                 ))}
               </div>
-              <Campo etiqueta="Tipo" value={d.tipo} onChange={(e) => poner({ tipo: e.target.value })} maxLength={60} />
+              <Campo etiqueta="Tipo" autoCapitalize="none" autoComplete="off" value={d.tipo} onChange={(e) => poner({ tipo: e.target.value })} maxLength={60} />
             </div>
           ),
         },
@@ -211,41 +216,43 @@ export function AsistenteComercio({ hecho }: Props) {
                 <span className="min-w-0 flex-1">{d.lat ? "Ubicación guardada" : "Usar mi ubicación (estoy en el comercio)"}
                   {d.lat && <span className="num block text-[12px] font-normal text-tinta-3">{d.lat.toFixed(5)}, {d.lon!.toFixed(5)}</span>}</span>
               </button>
-              <Campo etiqueta="Zona o barrio" value={d.zona} onChange={(e) => poner({ zona: e.target.value })} maxLength={120} />
-              <Campo etiqueta="Dirección (opcional)" value={d.direccion} onChange={(e) => poner({ direccion: e.target.value })} maxLength={200} />
-              <Campo etiqueta="Enlace de Google Maps (opcional)" type="url" placeholder="https://maps.app.goo.gl/…" value={d.mapsUrl} onChange={(e) => poner({ mapsUrl: e.target.value })} />
+              <Campo etiqueta="Zona o barrio" autoCapitalize="words" autoComplete="off" value={d.zona} onChange={(e) => poner({ zona: e.target.value })} maxLength={120} />
+              <Campo etiqueta="Dirección (opcional)" autoComplete="off" value={d.direccion} onChange={(e) => poner({ direccion: e.target.value })} maxLength={200} />
+              <Campo etiqueta="Enlace de Google Maps (opcional)" type="url" inputMode="url" autoCapitalize="none" autoCorrect="off" spellCheck={false} autoComplete="off" placeholder="https://maps.app.goo.gl/…" value={d.mapsUrl} onChange={(e) => poner({ mapsUrl: e.target.value })} />
             </div>
           ),
         },
-        { titulo: "¿Con quién hablar?", contenido: () => <Campo etiqueta="Contacto (opcional)" placeholder="Nombre y teléfono" value={d.contacto} onChange={(e) => poner({ contacto: e.target.value })} maxLength={200} /> },
+        { titulo: "¿Con quién hablar?", contenido: () => <Campo etiqueta="Contacto (opcional)" autoComplete="off" placeholder="Nombre y teléfono" value={d.contacto} onChange={(e) => poner({ contacto: e.target.value })} maxLength={200} /> },
       ]}
     />
   );
 }
 
 export function AsistenteCompra({ hecho }: Props) {
-  const [d, poner, limpiar] = useBorrador("compra", { uds: "", coste: "", proveedor: "" });
+  const [d, poner, limpiar, borrador] = useBorrador("compra", { uds: "", coste: "", proveedor: "" });
   const n = Number(d.uds), c = aCent(d.coste);
   const m = useAccion(() => api.post("/api/compras", { uds: n, cent: c, proveedor: d.proveedor }), `Compra de ${n} paneles apuntada`, { deshacer: true });
   return (
     <Pasos
+      borrador={borrador}
       textoFinal="Apuntar compra"
       ocupado={m.isPending}
       onTerminar={() => m.mutate(undefined, { onSuccess: () => (limpiar(), hecho()) })}
       pasos={[
-        { titulo: "¿Cuántos paneles?", validar: () => (Number.isInteger(n) && n > 0 ? null : "Pon cuántos paneles."), contenido: () => <Campo etiqueta="Paneles" type="number" inputMode="numeric" min={1} value={d.uds} onChange={(e) => poner({ uds: e.target.value })} className="!text-[24px] font-bold" /> },
-        { titulo: "¿Cuánto costaron en total?", validar: () => (c ? null : "Pon el coste total."), contenido: () => <div className="space-y-3"><Importe etiqueta="Coste total" placeholder="0" value={d.coste} onChange={(e) => poner({ coste: e.target.value })} />{n > 0 && c && <p className="num text-tinta-3">{euros(Math.round(c / n))} por panel</p>}</div> },
-        { titulo: "¿A quién?", contenido: () => <div className="space-y-3"><Campo etiqueta="Proveedor (opcional)" value={d.proveedor} onChange={(e) => poner({ proveedor: e.target.value })} maxLength={120} /><p className="text-[13px] text-tinta-3">Se apunta como gasto y suma al stock. Las ventas gastan primero los paneles más antiguos.</p></div> },
+        { titulo: "¿Cuántos paneles?", escribir: true, validar: () => (Number.isInteger(n) && n > 0 ? null : "Pon cuántos paneles."), contenido: () => <Campo etiqueta="Paneles" type="number" inputMode="numeric" min={1} value={d.uds} onChange={(e) => poner({ uds: e.target.value })} className="!text-[24px] font-bold" /> },
+        { titulo: "¿Cuánto costaron en total?", escribir: true, validar: () => (c ? null : "Pon el coste total."), contenido: () => <div className="space-y-3"><Importe etiqueta="Coste total" placeholder="0" value={d.coste} onChange={(e) => poner({ coste: e.target.value })} />{n > 0 && c && <p className="num text-tinta-3">{euros(Math.round(c / n))} por panel</p>}</div> },
+        { titulo: "¿A quién?", contenido: () => <div className="space-y-3"><Campo etiqueta="Proveedor (opcional)" autoCapitalize="words" autoComplete="off" value={d.proveedor} onChange={(e) => poner({ proveedor: e.target.value })} maxLength={120} /><p className="text-[13px] text-tinta-3">Se apunta como gasto y suma al stock. Las ventas gastan primero los paneles más antiguos.</p></div> },
       ]}
     />
   );
 }
 
 export function AsistenteRecordar({ comercio, hecho }: Props) {
-  const [d, poner, limpiar] = useBorrador<{ comercio: Eleccion | null; fecha: string; nota: string }>(`recordar:${comercio?.id ?? ""}`, { comercio: comercio ?? null, fecha: enDias(7), nota: "" });
+  const [d, poner, limpiar, borrador] = useBorrador<{ comercio: Eleccion | null; fecha: string; nota: string }>(`recordar:${comercio?.id ?? ""}`, { comercio: comercio ?? null, fecha: enDias(7), nota: "" });
   const m = useAccion(async () => api.post("/api/recordatorios", { comercioId: await idComercio(d.comercio!), fecha: d.fecha, nota: d.nota }), `Te recuerdo ${nombreEleccion(d.comercio)} el ${fechaCorta(d.fecha)}`);
   return (
     <Pasos
+      borrador={borrador}
       textoFinal="Guardar recordatorio"
       ocupado={m.isPending}
       onTerminar={() => m.mutate(undefined, { onSuccess: () => (limpiar(), hecho()) })}
@@ -258,11 +265,11 @@ export function AsistenteRecordar({ comercio, hecho }: Props) {
             <div className="space-y-4">
               <div className="flex flex-wrap gap-2">
                 {[["Mañana", 1], ["En 3 días", 3], ["En una semana", 7], ["En dos semanas", 14]].map(([t, n]) => (
-                  <button key={t} type="button" onClick={() => poner({ fecha: enDias(n as number) })} aria-pressed={d.fecha === enDias(n as number)} className="rounded-full border border-borde-fuerte px-3 py-1.5 text-[14px] font-semibold aria-pressed:border-base aria-pressed:bg-base aria-pressed:text-sobre-base">{t}</button>
+                  <button key={t} type="button" onClick={() => poner({ fecha: enDias(n as number) })} aria-pressed={d.fecha === enDias(n as number)} className="min-h-11 rounded-full border border-borde-fuerte px-3.5 py-2 text-[14px] font-semibold aria-pressed:border-base aria-pressed:bg-base aria-pressed:text-sobre-base">{t}</button>
                 ))}
               </div>
               <Campo etiqueta="Día" type="date" min={hoyMadrid()} value={d.fecha} onChange={(e) => poner({ fecha: e.target.value })} ayuda="Ese día a las 9:00 te llega por privado en Telegram." />
-              <Campo etiqueta="Nota (opcional)" placeholder="Llamar al dueño…" value={d.nota} onChange={(e) => poner({ nota: e.target.value })} maxLength={500} />
+              <Campo etiqueta="Nota (opcional)" autoCapitalize="sentences" autoComplete="off" placeholder="Llamar al dueño…" value={d.nota} onChange={(e) => poner({ nota: e.target.value })} maxLength={500} />
             </div>
           ),
         },

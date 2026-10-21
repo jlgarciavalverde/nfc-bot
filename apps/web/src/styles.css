@@ -1,6 +1,9 @@
 @import "@fontsource-variable/montserrat/wght.css";
 @import "tailwindcss";
 
+/* Mientras el teclado del móvil está abierto (lo pone useTeclado en <html>) */
+@custom-variant teclado (:root[data-teclado] &);
+
 /*
  * «La marca de la placa»: el panel se parece al producto que está en el mostrador del comercio.
  * Negro de la base, crema de la placa, ámbar de las estrellas y Montserrat (la tipografía impresa en la placa).
@@ -74,6 +77,15 @@
 }
 
 @layer components {
+  /* Hoja del móvil: encima del teclado (iOS) y nunca más alta que lo visible. Ver lib/teclado.ts. */
+  .hoja-movil {
+    bottom: var(--teclado, 0px);
+    max-height: calc(var(--vvh, 100dvh) - 12px);
+  }
+  :root:not([data-teclado]) .hoja-movil {
+    max-height: min(94dvh, calc(var(--vvh, 100dvh) - 12px));
+  }
+
   /* Tarjeta con el marco interior de la placa impresa (línea fina a 5 px del borde). */
   .tarjeta-placa {
     position: relative;

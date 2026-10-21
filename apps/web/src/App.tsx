@@ -5,6 +5,7 @@ import { api, ErrorApi } from "./lib/api";
 import { useYo } from "./lib/consultas";
 import type { Socio } from "./lib/tipos";
 import { AvisosProvider } from "./lib/acciones";
+import { useTeclado } from "./lib/teclado";
 import { ApuntarProvider } from "./apuntar/Apuntar";
 import { BuscadorProvider } from "./marco/Buscador";
 import { Marco } from "./marco/Marco";
@@ -31,6 +32,7 @@ const Galeria = lazy(() => import("./paginas/Galeria"));
 export function App() {
   const [ruta] = useLocation();
   const yo = useYo();
+  useTeclado();
   if (ruta === "/entrar") return <Pantalla><Entrar /></Pantalla>;
   if (yo.isPending) return <Pantalla><Esqueleto lineas={2} /></Pantalla>;
   if (yo.isError) return yo.error instanceof ErrorApi && yo.error.status === 401 ? <Pantalla><SinSesion /></Pantalla> : <Pantalla><p className="text-sale" role="alert">{yo.error.message}</p></Pantalla>;

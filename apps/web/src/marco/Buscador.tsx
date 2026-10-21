@@ -57,9 +57,9 @@ export function BuscadorProvider({ children }: { children: ReactNode }) {
             <Command label="Buscar" loop>
               <div className="flex items-center gap-2 border-b border-borde px-4">
                 <MagnifyingGlass size={18} className="text-tinta-3" />
-                <Command.Input autoFocus placeholder="Comercio, acción o sección…" className="h-13 min-h-12 flex-1 bg-transparent text-[16px] outline-none placeholder:text-tinta-3" />
+                <Command.Input autoFocus enterKeyHint="go" autoCapitalize="none" autoCorrect="off" spellCheck={false} placeholder="Comercio, acción o sección…" className="h-13 min-h-12 flex-1 bg-transparent text-[16px] outline-none placeholder:text-tinta-3" />
               </div>
-              <Command.List className="max-h-[60vh] overflow-y-auto p-2">
+              <Command.List className="max-h-[min(60vh,calc(var(--vvh,100dvh)-8vh-90px))] overflow-y-auto p-2">
                 <Command.Empty className="px-3 py-6 text-center text-tinta-3">Nada con ese nombre.</Command.Empty>
                 <Command.Group heading="Apuntar" className="[&_[cmdk-group-heading]]:px-3 [&_[cmdk-group-heading]]:py-1.5 [&_[cmdk-group-heading]]:text-[12px] [&_[cmdk-group-heading]]:font-semibold [&_[cmdk-group-heading]]:text-tinta-3">
                   {ACCIONES.map((a) => (

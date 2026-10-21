@@ -42,7 +42,7 @@ export function Cifra({ etiqueta, valor, nota, tono, grande }: { etiqueta: strin
   return (
     <div className="min-w-0">
       <div className="text-[13px] font-semibold text-tinta-3">{etiqueta}</div>
-      <div className={`num truncate font-bold leading-[1.1] tracking-tight ${grande ? "text-[34px] sm:text-[40px]" : "text-[24px] sm:text-[28px]"} ${tono === "entra" ? "text-entra" : tono === "sale" ? "text-sale" : ""}`}>{valor}</div>
+      <div className={`num font-bold leading-[1.1] tracking-tight whitespace-nowrap ${grande ? "text-[clamp(24px,7.4vw,34px)] sm:text-[40px]" : "text-[clamp(20px,6vw,24px)] sm:text-[28px]"} ${tono === "entra" ? "text-entra" : tono === "sale" ? "text-sale" : ""}`}>{valor}</div>
       {nota && <div className="num mt-0.5 text-[13px] text-tinta-3">{nota}</div>}
     </div>
   );

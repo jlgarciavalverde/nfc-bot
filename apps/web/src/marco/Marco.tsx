@@ -88,8 +88,8 @@ export function Marco({ nombre, esAdmin, children }: { nombre: string; esAdmin: 
         {children}
       </main>
 
-      {/* Barra inferior (móvil) */}
-      <nav aria-label="Secciones" className="fixed inset-x-0 bottom-0 z-30 border-t border-borde bg-superficie/95 backdrop-blur lg:hidden" style={{ paddingBottom: "env(safe-area-inset-bottom)" }}>
+      {/* Barra inferior (móvil); con el teclado abierto se quita para dejar sitio a lo que se escribe */}
+      <nav aria-label="Secciones" className="fixed inset-x-0 bottom-0 z-30 border-t border-borde bg-superficie/95 backdrop-blur lg:hidden teclado:hidden" style={{ paddingBottom: "env(safe-area-inset-bottom)" }}>
         <ul className="mx-auto grid h-16 max-w-md grid-cols-5 items-center">
           <TabInferior s={PRINCIPALES[0]!} activa={activa(ruta, "/")} onPrecarga={() => precargar(qc, "/")} />
           <TabInferior s={PRINCIPALES[1]!} activa={activa(ruta, "/comercios")} onPrecarga={() => precargar(qc, "/comercios")} />
