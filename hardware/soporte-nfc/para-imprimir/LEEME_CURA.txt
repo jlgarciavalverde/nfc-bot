@@ -1,0 +1,33 @@
+SOPORTE NFC RESEÑAS: instrucciones para Cura
+=============================================
+
+PIEZAS (STL, en milímetros)
+  placa_nfc_sin_qr.stl   Placa frontal, versión sin QR (100 x 117 mm)
+  placa_nfc_con_qr.stl   Placa con QR (100 x 165 mm). Solo cuando lleve el enlace real del negocio
+  base_nfc.stl           Base con ranura a 70°
+  tapa_nfc.stl           Tapa del hueco de la pegatina NFC
+
+Ajustes generales: PLA, capa de 0.2 mm, SIN soportes, sin balsa (con faldón vale).
+
+1) PLACA: en plano, con el texto hacia ARRIBA (tal como se abre en Cura)
+   - Relleno del 20 %, 3 paredes.
+   - Recomendado: Planchado (ironing) activado, con "Planchar solo la capa más alta" DESACTIVADO.
+   - DOS COLORES con un solo extrusor:
+       Extensiones > Postprocesamiento > Modificar G-Code > Añadir script > "Pausa a altura" (Pause at height)
+       Pausa por: Capa. Pon la PRIMERA capa en la que aparecen las letras en la vista previa
+       (con capas de 0.2 mm suele ser la 21: la placa mide 4.0 mm y las letras 0.6 mm más).
+       Cuando pare: cambia a filamento OSCURO (negro) y reanuda.
+   - Placa clara y letras oscuras: el QR solo se lee con buen contraste.
+
+2) BASE: tal cual, con la cara plana sobre la cama
+   - 4 paredes y un 25 % de relleno para que pese. Color negro o el que quieras.
+
+3) TAPA: en plano, del color de la placa.
+
+MONTAJE
+   - La pegatina NFC va en el hueco redondo de la parte de atrás de la placa; luego se mete la tapa a presión.
+   - La placa encaja en la ranura de la base (si queda floja, una gota de pegamento).
+   - Debajo de la base hay 4 huecos para pies de goma adhesivos de 10 mm.
+
+TINKERCAD: los STL se pueden importar para verlos o hacer retoques sencillos.
+Los textos y el QR conviene cambiarlos en el archivo original (.scad), no en Tinkercad.

@@ -1,0 +1,108 @@
+<!doctype html>
+<html lang="es"><head><meta charset="utf-8"><title>Soporte NFC de reseñas: ficha para impresión</title>
+<style>
+@page { size: A4; margin: 14mm; }
+* { box-sizing: border-box; }
+body { font: 10.5pt/1.45 "Montserrat", -apple-system, "Helvetica Neue", Arial, sans-serif; color: #19181a; margin: 0; }
+@font-face { font-family: Montserrat; src: url(../modelo/fonts/Montserrat-Medium.ttf); font-weight: 500; }
+@font-face { font-family: Montserrat; src: url(../modelo/fonts/Montserrat-SemiBold.ttf); font-weight: 600 800; }
+h1 { font-size: 22pt; margin: 0 0 2mm; letter-spacing: -0.02em; }
+h2 { font-size: 14pt; margin: 7mm 0 3mm; }
+.sub { color: #4f4b44; margin: 0 0 6mm; }
+.pagina { page-break-after: always; }
+.dos { display: grid; grid-template-columns: 1fr 1fr; gap: 6mm; }
+.tres { display: grid; grid-template-columns: repeat(5, 1fr); gap: 3mm; }
+.tres img { height: 38mm; object-fit: contain; }
+.tres figcaption { font-size: 8pt; padding: 1.5mm 2mm; }
+figure { margin: 0; border: 1px solid #ddd7cb; border-radius: 4mm; overflow: hidden; background: #f8f8f8; }
+figure img { display: block; width: 100%; }
+figcaption { padding: 2mm 3mm; font-size: 9pt; color: #4f4b44; background: #fff; border-top: 1px solid #ddd7cb; }
+table { width: 100%; border-collapse: collapse; font-size: 9.5pt; }
+th, td { text-align: left; padding: 2mm 2.5mm; border-bottom: 1px solid #ddd7cb; vertical-align: top; }
+th { font-weight: 600; color: #4f4b44; background: #f4f1ea; }
+.chip { display: inline-block; width: 3.5mm; height: 3.5mm; border-radius: 1mm; border: 1px solid #999; vertical-align: -0.6mm; margin-right: 1mm; }
+.aviso { border-left: 1.2mm solid #f2b01e; background: #f4f1ea; padding: 3mm 4mm; border-radius: 1.5mm; margin: 4mm 0; }
+ol li { margin-bottom: 1.5mm; }
+.marca { display:flex; align-items:center; gap:3mm; margin-bottom: 5mm; }
+.marca span { width: 9mm; height: 9mm; background:#141414; border-radius: 2mm; color:#f2b01e; display:flex; align-items:center; justify-content:center; font-size: 15pt; }
+</style></head><body>
+
+<section class="pagina">
+  <div class="marca"><span>★</span><b>Paneles NFC de reseñas</b></div>
+  <h1>Soporte NFC de reseñas</h1>
+  <p class="sub">Ficha para impresión. Tres piezas impresas (placa, base y tapa) y una pegatina NFC comprada. Ejemplo con la placa de código <b>M4PSN</b>.</p>
+  <div class="dos">
+    <figure><img src="imagenes/conjunto.png"><figcaption>Montado: la placa encaja en la ranura de la base, inclinada a 70°.</figcaption></figure>
+    <figure><img src="imagenes/despiece.png"><figcaption>Despiece: la placa sale hacia arriba de la ranura.</figcaption></figure>
+    <figure><img src="imagenes/trasera.png"><figcaption>Por detrás: la tapa redonda tapa la pegatina NFC y lleva grabado el código.</figcaption></figure>
+    <figure><img src="imagenes/despiece_trasera.png"><figcaption>Despiece trasero: placa, pegatina NFC (dorada) y tapa con el código.</figcaption></figure>
+  </div>
+</section>
+
+<section class="pagina">
+  <h1>Piezas</h1>
+  <p class="sub">Medidas en milímetros. PLA, capa de 0,2 mm, sin soportes y sin balsa (con faldón vale) en todas las piezas.</p>
+  <table>
+    <tr><th>Pieza</th><th>Archivo</th><th>Medidas</th><th>Color</th><th>Cómo imprimir</th></tr>
+    <tr><td><b>Placa</b><br>1 por soporte</td><td>placa_M4PSN.stl<br><small>(una distinta por código)</small></td><td>100 × 165 × 4<br>+ 0,6 de relieve</td>
+      <td><span class="chip" style="background:#efebe3"></span>Crema o blanco<br><span class="chip" style="background:#18181b"></span>Relieve negro</td>
+      <td>En plano, texto hacia arriba. Boquilla de 0,4 mm con «Imprimir paredes finas». 3 paredes, 20 % de relleno. Planchado (ironing) recomendado. <b>Cambio de filamento a Z = 4,0 mm</b> (capa 21): pausa y cambia a negro para el relieve.</td></tr>
+    <tr><td><b>Base</b><br>1 por soporte</td><td>base_nfc.stl<br><small>(igual para todas)</small></td><td>112 × 76 × 13</td><td><span class="chip" style="background:#26262a"></span>Negro</td>
+      <td>Apoyada en la cara plana. 4 paredes y 25 % de relleno (para que pese). Debajo lleva 4 huecos de Ø10 para pies de goma.</td></tr>
+    <tr><td><b>Tapa</b><br>1 por soporte</td><td>tapa_M4PSN.stl<br><small>(una distinta por código)</small></td><td>Ø 30,7 × 2,2</td><td><span class="chip" style="background:#efebe3"></span>Como la placa</td>
+      <td>En plano. El código va grabado (0,6 mm) en la cara de la cama, en espejo, para leerse bien con la tapa puesta.</td></tr>
+    <tr><td><b>Pegatina NFC</b><br>1 por soporte</td><td>(se compra)</td><td>Ø 25–30</td><td>—</td><td>NTAG213 o NTAG215. Se graba desde el panel con el móvil.</td></tr>
+  </table>
+  <div class="aviso"><b>Muy importante:</b> cada placa va con <b>su</b> tapa (mismo código en el nombre del archivo). No mezclar tapas entre placas. La base vale para cualquiera.</div>
+  <div class="tres" style="margin-top:4mm">
+    <figure><img src="imagenes/placa.png"><figcaption>Placa (cara delantera)</figcaption></figure>
+    <figure><img src="imagenes/placa_trasera.png"><figcaption>Placa (detrás): hueco NFC</figcaption></figure>
+    <figure><img src="imagenes/tapa.png"><figcaption>Tapa con el código M4PSN</figcaption></figure>
+    <figure><img src="imagenes/base.png"><figcaption>Base con la ranura</figcaption></figure>
+    <figure><img src="imagenes/base_abajo.png"><figcaption>Base (debajo): pies</figcaption></figure>
+  </div>
+</section>
+
+<section class="pagina">
+  <h1>Medidas comprobadas</h1>
+  <p class="sub">Calculadas sobre el modelo real (OpenSCAD), no a ojo. Las piezas no chocan entre sí en ninguna posición de montaje.</p>
+  <table>
+    <tr><th>Qué</th><th>Medida</th><th>Resultado</th></tr>
+    <tr><td>Placa</td><td>100 × 165 × 4,0 mm + relieve 0,6 mm (4,6 mm en total)</td><td>Necesita una cama de al menos 100 × 165 mm (cabe en las habituales de 220 × 220)</td></tr>
+    <tr><td>Base</td><td>112 × 76 × 13 mm</td><td>Más ancha que la placa (6 mm por cada lado)</td></tr>
+    <tr><td>Tapa</td><td>Ø 30,7 × 2,2 mm</td><td>Código grabado de 22 mm de ancho y 0,6 mm de profundidad, centrado</td></tr>
+    <tr><td>Ranura de la base</td><td>4,4 mm para una placa de 4,0 mm (0,2 mm de holgura por lado)</td><td>Placa y base no se tocan. El relieve de delante empieza por encima de la ranura</td></tr>
+    <tr><td>Placa dentro de la base</td><td>Entra 10,6 mm (10 mm en vertical), inclinada a 70°</td><td>El marco impreso empieza a 14 mm: queda todo a la vista</td></tr>
+    <tr><td>Hueco de la pegatina</td><td>Ø 31 × 3,0 mm, con 1,0 mm de pared por delante</td><td>Sirven pegatinas de Ø 25 y de Ø 30 mm</td></tr>
+    <tr><td>Tapa en el hueco</td><td>0,15 mm de holgura por lado, a presión</td><td>No choca. Queda 0,8 mm para la pegatina (suelen medir 0,1–0,4)</td></tr>
+    <tr><td>Estabilidad</td><td>El peso de la placa cae 28 mm por detrás de la ranura; la base sigue 46 mm</td><td>No vuelca hacia atrás ni hacia delante</td></tr>
+    <tr><td>QR (placas con código)</td><td>28 × 28 mm, 25 × 25 módulos de 1,12 mm</td><td>Margen blanco de más de 4 módulos en todos los lados: se lee bien</td></tr>
+    <tr><td>Textos pequeños</td><td>Trazos de 0,56–0,61 mm («Acerca tu móvil», «Escanea el código»)</td><td>Imprimibles con boquilla de 0,4 mm. <b>En Cura, activa «Imprimir paredes finas»</b>. Con boquilla de 0,6 mm se perderían</td></tr>
+    <tr><td>Marco y trazos</td><td>0,8 mm</td><td>Dos pasadas de boquilla de 0,4 mm</td></tr>
+    <tr><td>Pies de goma</td><td>4 huecos de Ø 10,4 × 1 mm</td><td>Para pies adhesivos de Ø 10 mm</td></tr>
+  </table>
+  <div class="aviso">Lo único que conviene comprobar con una impresión de prueba es el <b>ajuste a presión de la tapa</b> (cada impresora sale un poco más gruesa o más fina). Si no entra o baila, se cambia <code>holgura_tapa</code> y se vuelve a imprimir solo la tapa.</div>
+</section>
+
+<section>
+  <h1>Montaje y ajustes</h1>
+  <h2>Montaje</h2>
+  <ol>
+    <li>Graba la pegatina NFC (desde el panel, con el móvil, o con la app NFC Tools).</li>
+    <li>Pégala en el fondo del hueco redondo de detrás de la placa.</li>
+    <li>Mete la tapa a presión (la muesca lateral sirve para sacarla con la uña).</li>
+    <li>Encaja la placa en la ranura de la base. No hace falta pegarla; si queda floja, una gota de pegamento.</li>
+    <li>Pega 4 pies de goma de Ø10 mm debajo de la base.</li>
+  </ol>
+  <h2>Si algo no encaja</h2>
+  <table>
+    <tr><th>Problema</th><th>Ajuste en el diseño</th></tr>
+    <tr><td>La tapa no entra o queda muy floja</td><td><code>holgura_tapa</code> (ahora 0,15): súbela a 0,2 si no entra.</td></tr>
+    <tr><td>La placa no entra en la ranura</td><td><code>holgura_ranura</code> (ahora 0,2): súbela a 0,3.</td></tr>
+    <tr><td>El móvil no lee la pegatina</td><td><code>pared_frontal</code> (ahora 1,0): bájala a 0,8.</td></tr>
+  </table>
+  <h2>Antes de imprimir una tanda</h2>
+  <p>Conviene imprimir primero <b>un soporte de prueba</b> (placa, base y tapa) para comprobar el encaje y que el QR se lee con el móvil. Con eso confirmado, el resto de la tanda sale igual.</p>
+  <p style="color:#69645b; font-size: 9pt; margin-top: 8mm">Archivos: carpeta <code>stl/</code> de este paquete (placa_M4PSN.stl, tapa_M4PSN.stl, base_nfc.stl). Diseño original: soporte_nfc.scad (OpenSCAD).</p>
+</section>
+</body></html>

@@ -1,0 +1,4 @@
+# Las piezas de cada lote se regeneran con scripts/generar_lote.py (se guarda lote.csv y codigos.txt)
+lotes/**/*.stl
+__pycache__/
+.DS_Store

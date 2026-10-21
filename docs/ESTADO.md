@@ -55,7 +55,9 @@ Hecho todo el plan (F0–F6):
   socio, freno global a códigos de entrada, aviso por Telegram de cada inicio de sesión, auditoría (admin),
   Permissions-Policy. Un socio solo cobra sus ventas (también en el bot).
 - Tests: core 33, api 25, bot 30, web 5, e2e 12 (axe AA claro y oscuro, NFC simulado).
-- Pendiente: que `hardware/soporte-nfc/generar_lote.py` acepte `--lote lote.csv` (códigos reservados en la web).
+- `hardware/soporte-nfc/` reorganizado (modelo/, scripts/, para-imprimir/, lotes/, presentacion/, entregas/);
+  `scripts/generar_lote.py --lote lote.csv` usa los códigos reservados en el panel; medidas comprobadas y ficha en PDF
+  para la impresora; código de la tapa ajustado al 72 % del diámetro (antes se salía).
 
 ### Placas con código
 - Cada placa impresa lleva un código de 5 caracteres (4 al azar + 1 de control, alfabeto sin 0/O/1/I/L) en el QR y la

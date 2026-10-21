@@ -54,4 +54,6 @@ Desarrollo: `cp deploy/.env.example .env` (BOT_TOKEN de un bot de pruebas, `AI_F
 - Avisos: nunca enviar a Telegram desde la API ni desde scripts: dejar el mensaje en `avisos` (`avisar()` o un `insert`)
   y lo envía el bot. Texto en HTML de Telegram (escapar con `html()`).
 - El contenedor `nfc-backup` y `tools/deploy.mjs` escriben en `avisos` por SQL: si cambia esa tabla, revisarlos.
-- La carpeta `hardware/` (soporte 3D en OpenSCAD) es de otro trabajo: no forma parte de la app.
+- `hardware/soporte-nfc/` es el producto físico (OpenSCAD + scripts Python, ver su README). Las STL de `lotes/` no se
+  versionan (se regeneran). El cálculo del carácter de control de los códigos está repetido en
+  `packages/core/src/servicios/placas.ts`, `apps/web/src/lib/nfc.ts` y `hardware/soporte-nfc/scripts/generar_lote.py`.

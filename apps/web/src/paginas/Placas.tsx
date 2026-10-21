@@ -132,7 +132,7 @@ function NuevoLote({ hecho }: { hecho: () => void }) {
           <a href={`/api/lotes/${resultado.lote.id}/qr.zip`} download className={claseBoton("secundario", "lg")}><DownloadSimple size={18} /> QR (zip)</a>
         </div>
         <ol className="list-decimal space-y-1 pl-5 text-[14px] text-tinta-2">
-          <li>En el Mac: <code className="font-mono text-[13px]">python generar_lote.py --lote lote-{resultado.lote.id}.csv</code> genera las placas y tapas con estos códigos.</li>
+          <li>En el Mac, en <code className="font-mono text-[13px]">hardware/soporte-nfc</code>: <code className="font-mono text-[13px]">uv run --with segno python scripts/generar_lote.py --lote lote-{resultado.lote.id}.csv</code> genera las placas y tapas con estos códigos.</li>
           <li>Imprime cada placa con su tapa (mismo código).</li>
           <li>Al instalarla en un comercio: «Activar placa» y graba la pegatina desde el móvil.</li>
         </ol>
