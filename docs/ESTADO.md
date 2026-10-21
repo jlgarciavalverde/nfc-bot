@@ -10,7 +10,7 @@ Hecho todo el plan (F0–F6):
   y confirmación por botón.
 - **Panel** (`nfc.redgarverde.com`): resumen con gráficas, comercios + ficha, mapa, ventas, caja, stock, reparto,
   precios (edición para admin, calculadora) y Excel con 7 hojas.
-- **Tests**: core 26, bot 16, api 7, e2e 6.
+- **Tests**: core 26, bot 18, api 7, e2e 6.
 - Copias: `nfc-backup` diario (30 días) + `tools/pull-backups.sh` y simulacro de restauración en el Mac (launchd).
 
 ## Pendiente (lo tiene que hacer el usuario)

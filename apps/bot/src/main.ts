@@ -14,7 +14,7 @@ if (!config.botToken) {
 }
 // Las migraciones las aplica la API al arrancar (Compose arranca el bot cuando la API está sana).
 const { db, sql: conn } = createDb(config.databaseUrl);
-const interprete = config.aiFake ? crearFake() : config.geminiApiKey ? crearGemini({ apiKey: config.geminiApiKey, model: config.geminiModel }) : undefined;
+const interprete = config.aiFake ? crearFake() : config.geminiApiKey ? crearGemini({ apiKey: config.geminiApiKey, models: config.geminiModels }) : undefined;
 const bot = crearBot({ db, config, interprete });
 
 try {
