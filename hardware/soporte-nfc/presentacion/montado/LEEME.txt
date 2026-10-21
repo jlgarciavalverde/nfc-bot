@@ -1,0 +1,9 @@
+Soporte NFC montado (para enseñar; NO es para imprimir así)
+
+- soporte_nfc_conjunto.stl / .3mf   base + placa encajada + tapa, con la placa de ejemplo M4PSN
+- soporte_nfc_despiece.stl / .3mf   las piezas separadas (placa por encima de la ranura, pegatina y tapa detrás)
+
+El .3mf lleva los colores reales (base negra, placa crema, relieves oscuros): ábrelo con el visor 3D de Windows,
+Bambu Studio, PrusaSlicer o Cura. El .stl es de un solo color (cualquier visor o la vista previa del Mac).
+Para imprimir, las piezas sueltas están en ../../para-imprimir/ y ../stl/.
+Se regeneran con: openscad --export-format binstl -D 'vista="conjunto"' -o montado/soporte_nfc_conjunto.stl vistas.scad
