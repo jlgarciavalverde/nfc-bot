@@ -3,6 +3,13 @@
 Lo que el bot anuncia en el grupo al actualizarse (`tools/deploy.mjs` publica la sección de la versión que despliega).
 Frases cortas, para los socios, sin tecnicismos.
 
+## 0.5.0
+- Panel renovado con la imagen de la placa: más rápido y cómodo en el móvil, con barra abajo y botón «+» para apuntar.
+- Todo se apunta por pasos (visita, venta, dinero, comercio…), sin formularios largos.
+- Placas desde el móvil: activar una placa, poner el enlace de reseñas y grabar la pegatina NFC (en Android con Chrome).
+- Ficha de cada comercio con su historia, sus placas y sus escaneos. Buscador con ⌘K o la lupa.
+- Más seguridad: cada inicio de sesión en el panel te llega por aquí, y cada socio cobra solo sus ventas.
+
 ## 0.4.0
 - Menos ruido en los chats: borro yo solo los mensajes que ya no sirven (enlaces del panel caducados, preguntas ya contestadas, errores y el aviso de ayer).
 - El mensaje de /panel explica mejor cómo entrar: el enlace caduca en 15 minutos si no lo abres, pero una vez dentro no hace falta volver a entrar.

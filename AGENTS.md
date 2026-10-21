@@ -38,8 +38,12 @@ Desarrollo: `cp deploy/.env.example .env` (BOT_TOKEN de un bot de pruebas, `AI_F
 6. Fechas de calendario en **hora de Madrid** (`hoy()`, `relojMadrid()`); el ejecutor pasa `fecha: ctx.hoy` a los servicios.
 7. Acceso: el bot calla con quien no es socio y en grupos no vinculados. Comandos de admin en `SOLO_ADMIN`.
 8. Panel: sesión por cookie `__Host-sid` (prod), cambios solo con `Origin` = `PUBLIC_URL`.
-9. Diseño del panel: «libro de cuentas» (blanco, tinta, ámbar de estrella solo como acento, verde/rojo solo para dinero).
-   Evitar los tics de diseño generado: sobretítulos en mayúsculas, tarjetas con sombra, degradados, «A · B · C», flechas en botones.
+9. Diseño del panel: «la marca de la placa» (negro de la base, crema de la placa, ámbar de las estrellas, Montserrat;
+   verde/rojo solo para dinero). Componentes en `apps/web/src/ui/` (Radix, vaul, cmdk); formularios por pasos con `ui/Pasos`.
+   Evitar los tics de diseño generado (sobretítulos en mayúsculas, sombras en tarjetas, degradados, «A · B · C», flechas en
+   botones): lo vigila `apps/web/src/diseno.test.ts`. Muestrario en `/galeria`.
+11. API: toda ruta `/api/*` declara `regla("publica"|"socio"|"admin")` (`apps/api/src/acceso.ts`); sin regla → 403.
+    La matriz de permisos se prueba sola en `seguridad.test.ts`. «Solo lo tuyo» (cobrar) se comprueba en el servicio con `esAdmin`.
 10. Secretos: nunca en el repo ni en el chat (`read -rsp` en el VPS). Hook gitleaks en `.githooks/`.
 
 ## Trampas conocidas

@@ -61,7 +61,7 @@ test("escritorio: barra lateral y buscador ⌘K", async ({ page }) => {
   await page.keyboard.press("ControlOrMeta+k");
   const buscar = page.getByRole("dialog", { name: "Buscar" });
   await buscar.getByRole("combobox").fill("panaderia");
-  await page.keyboard.press("Enter");
+  await buscar.getByRole("option", { name: /Panadería López/ }).click();
   await expect(page.getByRole("heading", { level: 1, name: "Panadería López" })).toBeVisible();
   await expect(page).toHaveURL(/\/comercios\/\d+$/);
 });
@@ -86,7 +86,7 @@ test("asistente de venta a un comercio nuevo, cobrarla y deshacer el cobro", asy
   const fila = page.getByRole("main").locator("div").filter({ hasText: /^Kiosko E2E/ }).filter({ has: page.getByRole("button", { name: /Cobrar la venta/ }) }).last();
   await fila.getByRole("button", { name: /Cobrar la venta/ }).click();
   await page.getByRole("group", { name: "Cómo ha pagado Kiosko E2E" }).getByRole("button", { name: "Bizum" }).click();
-  const aviso = page.getByRole("status").filter({ hasText: /Cobrados/ });
+  const aviso = page.getByRole("status").getByText(/^Cobrados/).locator("..");
   await expect(aviso).toBeVisible();
   await aviso.getByRole("button", { name: "Deshacer" }).click();
   await expect(page.getByRole("status").getByText(/Deshecho: Cobrada la venta/)).toBeVisible();
@@ -207,7 +207,7 @@ test("admin: tramo de precio y ajustes con aviso de cambios sin guardar", async 
   await hoja.getByRole("button", { name: "Guardar tramo" }).click();
   await expect(page.getByText("Desde 8 uds")).toBeVisible();
   await page.goto("/ajustes");
-  await page.getByRole("textbox", { name: "Avisar cuando queden menos de" }).fill("4");
+  await page.getByRole("spinbutton", { name: "Avisar cuando queden menos de" }).fill("4");
   await expect(page.getByText("Cambios sin guardar")).toBeVisible();
   await page.getByRole("button", { name: "Guardar" }).click();
   await expect(page.getByRole("status").getByText("Ajustes guardados")).toBeVisible();

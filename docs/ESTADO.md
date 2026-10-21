@@ -42,6 +42,21 @@ Hecho todo el plan (F0–F6):
   Errores: 5 min. Avisos breves del grupo: 1 min. «Hoy te toca»: el de cada día borra el anterior (clave `dia:<socio>`).
   «Hecho» de un recordatorio quita ese botón en vez de mandar mensaje.
 
+## v0.5.0 (2026-10-21): renovación del panel
+- Diseño «la marca de la placa», carcasa nueva (barra inferior con «+» en el móvil, lateral en el ordenador, buscador ⌘K
+  que ignora tildes), páginas rehechas (Hoy, Comercios + mapa, ficha `/comercios/:id` con historia, Caja con pestañas,
+  Ventas, Stock, Placas, Precios, Cuenta, Más) y nuevas de admin (Ajustes, Socios, Auditoría).
+- Asistentes por pasos (`ui/Pasos`, borrador en sessionStorage): visita, venta, dinero, comercio (geolocalización),
+  compra, recordatorio y **placa** (leer pegatina/QR o escribir código, comercio, enlace de reseñas guiado o Place ID,
+  grabar + comprobar + bloquear con Web NFC; sin Web NFC, URL para NFC Tools).
+- Lotes de placas en la BD (`tandas_placas`, `placas.tanda_id`, migración 0004): reservar desde el panel (admin),
+  descargar `lote.csv` y `qr.zip`. Los 3 códigos del lote de ejemplo del Mac (M4PSN, GNDAT, P3MCS) importados como lote.
+- Seguridad: `acceso.ts` (regla por ruta, denegado por defecto), matriz de permisos generada, límite de escrituras por
+  socio, freno global a códigos de entrada, aviso por Telegram de cada inicio de sesión, auditoría (admin),
+  Permissions-Policy. Un socio solo cobra sus ventas (también en el bot).
+- Tests: core 33, api 25, bot 30, web 5, e2e 12 (axe AA claro y oscuro, NFC simulado).
+- Pendiente: que `hardware/soporte-nfc/generar_lote.py` acepte `--lote lote.csv` (códigos reservados en la web).
+
 ### Placas con código
 - Cada placa impresa lleva un código de 5 caracteres (4 al azar + 1 de control, alfabeto sin 0/O/1/I/L) en el QR y la
   pegatina NFC: `/r/<código>` (también `/R/`, el QR va en mayúsculas para salir más pequeño). Redirige (302, sin caché)

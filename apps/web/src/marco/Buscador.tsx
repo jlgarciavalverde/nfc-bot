@@ -7,6 +7,7 @@ import { useComercios, useYo } from "../lib/consultas";
 import { useApuntar, type TipoApunte } from "../apuntar/Apuntar";
 import { PRINCIPALES, SECUNDARIAS } from "./Marco";
 import { PuntoEstado } from "../ui/Superficies";
+import { normalizar } from "../lib/formato";
 
 const Ctx = createContext<() => void>(() => {});
 export const useBuscador = () => useContext(Ctx);
@@ -70,7 +71,7 @@ export function BuscadorProvider({ children }: { children: ReactNode }) {
                 {!!comercios.data?.length && (
                   <Command.Group heading="Comercios" className="[&_[cmdk-group-heading]]:px-3 [&_[cmdk-group-heading]]:py-1.5 [&_[cmdk-group-heading]]:text-[12px] [&_[cmdk-group-heading]]:font-semibold [&_[cmdk-group-heading]]:text-tinta-3">
                     {comercios.data.map((c) => (
-                      <Command.Item key={c.id} value={`comercio ${c.nombre} ${c.zona ?? ""} ${c.tipo ?? ""}`} onSelect={() => hacer(() => ir(`/comercios/${c.id}`))} className={item}>
+                      <Command.Item key={c.id} value={`comercio ${c.nombre} ${normalizar(`${c.nombre} ${c.zona ?? ""} ${c.tipo ?? ""}`)} #${c.id}`} onSelect={() => hacer(() => ir(`/comercios/${c.id}`))} className={item}>
                         <PuntoEstado estado={c.estado} />
                         <span className="min-w-0 flex-1 truncate">{c.nombre}</span>
                         {c.zona && <span className="text-[13px] text-tinta-3">{c.zona}</span>}
