@@ -1,5 +1,7 @@
 # Novedades
 
+[← Documentación](README.md) · [README del proyecto](../README.md)
+
 Lo que el bot anuncia en el grupo al actualizarse (`tools/deploy.mjs` publica la sección de la versión que despliega).
 Frases cortas, para los socios, sin tecnicismos.
 

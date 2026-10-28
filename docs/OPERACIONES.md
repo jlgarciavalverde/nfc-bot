@@ -1,5 +1,7 @@
 # Operaciones
 
+[← Documentación](README.md) · [README del proyecto](../README.md)
+
 ## Primera instalación
 1. `node tools/deploy.mjs 0.1.0` desde el Mac. Crea `~/servicios/nfc/` con `.env` (contraseña de BD, `SETUP_CODE` y
    `PUBLIC_URL` generados) y arranca panel + BD + copias. Sin `BOT_TOKEN` no arranca el bot.

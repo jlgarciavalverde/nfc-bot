@@ -1,5 +1,7 @@
 # Estado
 
+[← Documentación](README.md) · [README del proyecto](../README.md)
+
 ## v0.1.0 (2026-10-21)
 Hecho todo el plan (F0–F6):
 - **Bot**: alta del primer admin con `SETUP_CODE`, `/vincular` el grupo, `/unirme` + aprobación; precios/tramos/ofertas,

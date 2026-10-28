@@ -1,5 +1,7 @@
 # El negocio
 
+[← Documentación](README.md) · [README del proyecto](../README.md)
+
 ## Producto
 Soporte de mostrador (placa + base + tapa, impresos en 3D) con pegatina NFC y QR. El cliente del comercio acerca el móvil
 o escanea el QR y llega a la página de reseñas de Google del comercio. Cada placa lleva un código (p. ej. M4PSN) que

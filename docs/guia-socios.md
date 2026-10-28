@@ -1,5 +1,7 @@
 # Guía rápida para los socios
 
+[← Documentación](README.md) · [README del proyecto](../README.md)
+
 Todo se apunta en el grupo de Telegram (o por privado al bot). Si te equivocas: `/deshacer` (10 minutos).
 
 **Al visitar un comercio**

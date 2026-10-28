@@ -1,5 +1,7 @@
 # Arquitectura
 
+[← Documentación](README.md) · [README del proyecto](../README.md)
+
 Un monorepo pnpm con dos procesos (bot y web) que comparten la lógica de negocio y una base de datos Postgres.
 
 | Paquete | Qué es |
